@@ -784,6 +784,11 @@ function UI:CreateTab(name, iconGlyph)
 	end
 
 	function Elements:AddSlider(title, description, min, max, default, callback)
+		local range = max - min
+		if range <= 0 then
+			max = min
+			range = 0
+		end
 		local value = math.clamp(default or min, min, max)
 		local Card = CreateBaseCard(title, description)
 
@@ -817,7 +822,7 @@ function UI:CreateTab(name, iconGlyph)
 			Parent = Hitbox,
 		}, { Round(UDim.new(1, 0)) })
 
-		local initialAlpha = (value - min) / (max - min)
+		local initialAlpha = range > 0 and ((value - min) / range) or 0
 		local Fill = Create("Frame", {
 			Size = UDim2.new(initialAlpha, 0, 1, 0),
 			BackgroundColor3 = Theme.Accent,
@@ -837,8 +842,8 @@ function UI:CreateTab(name, iconGlyph)
 			local trackWidth = Track.AbsoluteSize.X
 			if trackWidth <= 0 then return end
 			local alpha = math.clamp((inputPos.X - Track.AbsolutePosition.X) / trackWidth, 0, 1)
-			value = math.floor(min + (max - min) * alpha + 0.5)
-			local snappedAlpha = (value - min) / (max - min)
+			value = range > 0 and math.floor(min + range * alpha + 0.5) or min
+			local snappedAlpha = range > 0 and ((value - min) / range) or 0
 
 			Fill.Size = UDim2.new(snappedAlpha, 0, 1, 0)
 			Thumb.Position = UDim2.new(snappedAlpha, -7, 0.5, -7)
@@ -849,7 +854,8 @@ function UI:CreateTab(name, iconGlyph)
 		Hitbox.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				sliderDragging = true
-				Tween(Thumb, 0.12, { Size = UDim2.fromOffset(17, 17), Position = UDim2.new((value - min) / (max - min), -8.5, 0.5, -8.5) })
+				local alpha = range > 0 and ((value - min) / range) or 0
+				Tween(Thumb, 0.12, { Size = UDim2.fromOffset(17, 17), Position = UDim2.new(alpha, -8.5, 0.5, -8.5) })
 				UpdateSlider(input.Position)
 			end
 		end)
@@ -857,7 +863,8 @@ function UI:CreateTab(name, iconGlyph)
 		UserInputService.InputEnded:Connect(function(input)
 			if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 				sliderDragging = false
-				Tween(Thumb, 0.12, { Size = UDim2.fromOffset(14, 14), Position = UDim2.new((value - min) / (max - min), -7, 0.5, -7) })
+				local alpha = range > 0 and ((value - min) / range) or 0
+				Tween(Thumb, 0.12, { Size = UDim2.fromOffset(14, 14), Position = UDim2.new(alpha, -7, 0.5, -7) })
 			end
 		end)
 
@@ -1280,7 +1287,6 @@ ballfolder:Toggle("Auto Goal", "Attempts To Steal The Ball And Score.", function
                     local goal = localplayer.Team.Name == "A" and bgoal or agoal
                     if root and goal then
                         root.CFrame = goal.CFrame
-                        task.wait(0.185)
                         NET:FireServer(
                             buffer.fromstring(buffers["base"]),
                             {{"kick", 20, false, vector.create(0, 1, 0)}}
@@ -1299,11 +1305,13 @@ end)
 
 local alwaysBallState = {
     enabled = false,
-    conn = nil
+    thread = nil,
+    originalGravity = workspace.Gravity
 }
 
-ballfolder:Toggle("Always Ball", "Attempts To Always Hold The Ball (zero gravity while active).", function()
-    alwaysBallState.enabled = not alwaysBallState.enabled
+ballfolder:Toggle("Always Ball", "Attempts To Always Hold The Ball (zero gravity while active).", function(v)
+    if alwaysBallState.enabled == v then return end
+    alwaysBallState.enabled = v
     game.StarterGui:SetCore("SendNotification", {
         Title = "Always Ball",
         Text = alwaysBallState.enabled and "Enabled." or "Disabled.",
@@ -1312,7 +1320,7 @@ ballfolder:Toggle("Always Ball", "Attempts To Always Hold The Ball (zero gravity
     
     if alwaysBallState.enabled then
         workspace.Gravity = 0
-        alwaysBallState.conn = coroutine.wrap(function()
+        alwaysBallState.thread = task.spawn(function()
             while alwaysBallState.enabled do
                 local root = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                 local ball = workspace.Terrain:FindFirstChild("Ball")
@@ -1334,9 +1342,13 @@ ballfolder:Toggle("Always Ball", "Attempts To Always Hold The Ball (zero gravity
                 end
                 task.wait(0.1)
             end
-        end)()
+            if not alwaysBallState.enabled then
+                workspace.Gravity = alwaysBallState.originalGravity
+            end
+        end)
     else
-        workspace.Gravity = 196.2
+        alwaysBallState.thread = nil
+        workspace.Gravity = alwaysBallState.originalGravity
     end
 end)
 
@@ -1500,28 +1512,33 @@ ballfolder:Button("Get Flow (Req. Ball)", "Click To Attempt Getting Flow. Click 
     end)
 end)
 
-local stealActive = false
+local stealLoopStates = {
+    steal = false,
+    bring = false,
+    aikuSteal = false,
+    aikuBring = false,
+}
 
 ballfolder:Button("Steal Ball", "Repeatedly Attempts To Get The Ball. Click Again To Cancel.", function()
     local hrp = flowPartData.LocalPlayer.Character and flowPartData.LocalPlayer.Character.HumanoidRootPart
     if not hrp then return end
 
-    if stealActive then
-        stealActive = false
+    if stealLoopStates.steal then
+        stealLoopStates.steal = false
         return
     end
 
-    stealActive = true
+    stealLoopStates.steal = true
 
     spawn(function()
-        while stealActive and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
+        while stealLoopStates.steal and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
             local ball = workspace.Terrain:FindFirstChild("Ball")
             if ball then
                 hrp.CFrame = CFrame.new(ball.Position)
             end
 
             for _, p in game.Players:GetPlayers() do
-                if not stealActive then break end
+                if not stealLoopStates.steal then break end
                 if p ~= flowPartData.LocalPlayer then
                     local b = p.Character and p.Character:FindFirstChild("Ball")
                     if b then
@@ -1534,7 +1551,7 @@ ballfolder:Button("Steal Ball", "Repeatedly Attempts To Get The Ball. Click Agai
             task.wait(0.05)
         end
 
-        stealActive = false
+        stealLoopStates.steal = false
     end)
 end)
 
@@ -1542,24 +1559,24 @@ ballfolder:Button("Bring Ball", "Steals The Ball Then Teleports Back. Click Agai
     local hrp = flowPartData.LocalPlayer.Character and flowPartData.LocalPlayer.Character.HumanoidRootPart
     if not hrp then return end
 
-    if stealActive then
-        stealActive = false
+    if stealLoopStates.bring then
+        stealLoopStates.bring = false
         return
     end
 
-    stealActive = true
+    stealLoopStates.bring = true
 
     spawn(function()
         local orig = hrp.CFrame
 
-        while stealActive and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
+        while stealLoopStates.bring and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
             local ball = workspace.Terrain:FindFirstChild("Ball")
             if ball then
                 hrp.CFrame = CFrame.new(ball.Position)
             end
 
             for _, p in game.Players:GetPlayers() do
-                if not stealActive then break end
+                if not stealLoopStates.bring then break end
                 if p ~= flowPartData.LocalPlayer then
                     local ob = p.Character and p.Character:FindFirstChild("Ball")
                     if ob then
@@ -1572,11 +1589,11 @@ ballfolder:Button("Bring Ball", "Steals The Ball Then Teleports Back. Click Agai
             task.wait(0.05)
         end
 
-        if stealActive and hrp and hrp.Parent and flowPartData.LocalPlayer.Character:FindFirstChild("Ball") then
+        if stealLoopStates.bring and hrp and hrp.Parent and flowPartData.LocalPlayer.Character:FindFirstChild("Ball") then
             hrp.CFrame = orig
         end
 
-        stealActive = false
+        stealLoopStates.bring = false
     end)
 end)
 
@@ -1585,22 +1602,22 @@ ballfolder:Button("Steal Ball (Aiku)", "Repeatedly Attempts To Get The Ball Via 
     local hrp = flowPartData.LocalPlayer.Character and flowPartData.LocalPlayer.Character.HumanoidRootPart
     if not hrp then return end
 
-    if stealActive then
-        stealActive = false
+    if stealLoopStates.aikuSteal then
+        stealLoopStates.aikuSteal = false
         return
     end
 
-    stealActive = true
+    stealLoopStates.aikuSteal = true
 
     spawn(function()
-        while stealActive and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
+        while stealLoopStates.aikuSteal and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
             local ball = workspace.Terrain:FindFirstChild("Ball")
             if ball then
                 hrp.CFrame = CFrame.new(ball.Position)
             end
 
             for _, p in game.Players:GetPlayers() do
-                if not stealActive then break end
+                if not stealLoopStates.aikuSteal then break end
                 if p ~= flowPartData.LocalPlayer then
                     local b = p.Character and p.Character:FindFirstChild("Ball")
                     if b then
@@ -1613,7 +1630,7 @@ ballfolder:Button("Steal Ball (Aiku)", "Repeatedly Attempts To Get The Ball Via 
             task.wait(0.05)
         end
 
-        stealActive = false
+        stealLoopStates.aikuSteal = false
     end)
 end)
 
@@ -1621,24 +1638,24 @@ ballfolder:Button("Bring Ball (Aiku)", "Steals The Ball Via Reflex Tackle Then T
     local hrp = flowPartData.LocalPlayer.Character and flowPartData.LocalPlayer.Character.HumanoidRootPart
     if not hrp then return end
 
-    if stealActive then
-        stealActive = false
+    if stealLoopStates.aikuBring then
+        stealLoopStates.aikuBring = false
         return
     end
 
-    stealActive = true
+    stealLoopStates.aikuBring = true
 
     spawn(function()
         local orig = hrp.CFrame
 
-        while stealActive and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
+        while stealLoopStates.aikuBring and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
             local ball = workspace.Terrain:FindFirstChild("Ball")
             if ball then
                 hrp.CFrame = CFrame.new(ball.Position)
             end
 
             for _, p in game.Players:GetPlayers() do
-                if not stealActive then break end
+                if not stealLoopStates.aikuBring then break end
                 if p ~= flowPartData.LocalPlayer then
                     local ob = p.Character and p.Character:FindFirstChild("Ball")
                     if ob then
@@ -1651,11 +1668,11 @@ ballfolder:Button("Bring Ball (Aiku)", "Steals The Ball Via Reflex Tackle Then T
             task.wait(0.7)
         end
 
-        if stealActive and hrp and hrp.Parent and flowPartData.LocalPlayer.Character:FindFirstChild("Ball") then
+        if stealLoopStates.aikuBring and hrp and hrp.Parent and flowPartData.LocalPlayer.Character:FindFirstChild("Ball") then
             hrp.CFrame = orig
         end
 
-        stealActive = false
+        stealLoopStates.aikuBring = false
     end)
 end)
 
@@ -1869,7 +1886,7 @@ breakball:Button("Break Ball (Player Method, Req. Ball)", "Breaks The Ball By Go
     local character = lplr.Character or lplr.CharacterAdded:Wait()
 
     character:WaitForChild("HumanoidRootPart").CFrame =
-        CFrame.new(baseplatePosition + Vector3.new(0, 100000000000000, 0))
+        CFrame.new(baseplatePosition + Vector3.new(0, 10000, 0))
 end)
 
 breakball:Button("Break Ball (Ball Method, Req. Ball)", "Breaks The Ball By Kicking It Out Of Bounds.", function()
@@ -2050,16 +2067,16 @@ ballmag:Toggle("Ball Magnet On Bind Held", "If Enabled, Ball Magnet Only Grabs W
     })
 end)
 
-local function setupCharacter(char)
+local function setupBallMagnetCharacter(char)
     ballMagnetState.hrp = char:WaitForChild("HumanoidRootPart", 10)
 end
 
 if Players.LocalPlayer.Character then
-    setupCharacter(Players.LocalPlayer.Character)
+    setupBallMagnetCharacter(Players.LocalPlayer.Character)
 end
 
 Players.LocalPlayer.CharacterAdded:Connect(function(char)
-    setupCharacter(char)
+    setupBallMagnetCharacter(char)
 end)
 
 ballmag:Toggle("Ball Magnet Radius Hitbox", "Shows The Magnet's Radius Hitbox.", function()
@@ -2179,9 +2196,9 @@ local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local extraHud = playerGui:WaitForChild("ExtraHud")
-local fpsCounter = extraHud:WaitForChild("FPSCounter")
-local icon = fpsCounter:WaitForChild("icon")
+local extraHud = playerGui:FindFirstChild("ExtraHud")
+local fpsCounter = extraHud and extraHud:FindFirstChild("FPSCounter")
+local icon = fpsCounter and fpsCounter:FindFirstChild("icon")
 
 local existingGui = playerGui:FindFirstChild("cubies")
 if existingGui then
@@ -2238,6 +2255,7 @@ local function updcounterui()
 end
 
 function positionCubes()
+    if not icon then return end
     local iconPos = icon.AbsolutePosition
     local iconSize = icon.AbsoluteSize
     
@@ -2297,13 +2315,13 @@ if autoSkillState.showActiveCounters then
 else
     screenGui.Enabled = false
 end
-icon:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
-    if autoSkillState.showActiveCounters then
-        positionCubes()
-    end
-end)
-
-icon:GetPropertyChangedSignal("AbsolutePosition"):Connect(positionCubes)
+if icon then
+    icon:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+        if autoSkillState.showActiveCounters then
+            positionCubes()
+        end
+    end)
+end
 
 
 local steal_anims = {
@@ -2660,11 +2678,11 @@ add:Label("Fun Features: Pretty Fun Features I'd Say.")
 
 local AnimationId = "rbxassetid://106978014114973"
 local safety = Vector3.new(-540, 3, 1274)
-mapFolmain = workspace.map.map.sanam.main
-local floorAie = workspace.map.map.sanam.main.Size
-
-workspace.map.map.sanam.main.Size = Vector3.new(floorAie.X, 2, floorAie.Z)
-workspace.map.map.sanam.main.Position += Vector3.new(0, (floorAie.Y - 2) / 2, 0)
+local mapFolder = workspace:FindFirstChild("map")
+mapFolmain = mapFolder and mapFolder:FindFirstChild("map")
+if mapFolder and mapFolmain then
+    mapFolmain = mapFolmain:FindFirstChild("sanam") and mapFolmain.sanam:FindFirstChild("main")
+end
 
 invisState = {
     active = false,
@@ -2698,7 +2716,7 @@ local function startInvisibility()
     invisState.animationTrack = track
 end
 
-local function setupCharacter(char)
+local function setupInvisibilityCharacter(char)
     invisState.character = char
     invisState.humanoid = char:WaitForChild("Humanoid", 5)
 
@@ -2724,6 +2742,7 @@ RunService.RenderStepped:Connect(function()
             return
         end
         
+        if not mapFolmain or not mapFolmain.Parent then return end
         local floorTop = mapFolmain.Position.Y + mapFolmain.Size.Y / 2
         if rootPart.Position.Y > floorTop + 20 then
             local _, yaw, _ = rootPart.CFrame:ToOrientation()
@@ -2734,10 +2753,10 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-player.CharacterAdded:Connect(setupCharacter)
+player.CharacterAdded:Connect(setupInvisibilityCharacter)
 
 if player.Character then
-    setupCharacter(player.Character)
+    setupInvisibilityCharacter(player.Character)
 end
 
 add:Toggle("Invisibility (Method: Animation)", "Makes You Almost Fully Invisible To Other Players Using An Animation.", function(v)
@@ -2895,10 +2914,14 @@ add:Button("Steal Screen Time (funny)", "Click Z To Disable, Steals Screen Time.
     local plr = game.Players.LocalPlayer
     local char = plr.Character
     local cam = workspace.CurrentCamera
+    if getgenv().StealScreenInputConnection then
+        getgenv().StealScreenInputConnection:Disconnect()
+        getgenv().StealScreenInputConnection = nil
+    end
 
     local stopped = false
 
-    game.UserInputService.InputBegan:Connect(function(key, bg)
+    getgenv().StealScreenInputConnection = game.UserInputService.InputBegan:Connect(function(key, bg)
         if bg then return end
 
         if key.KeyCode == Enum.KeyCode.Z then
@@ -3000,10 +3023,13 @@ local sg = game:GetService("StarterGui")
 local ws = game:GetService("Workspace")
 
 local function setCollide(state)
-    local a = ws.map.gkbarriar.Abarriar
-    local b = ws.map.gkbarriar.Bbarriar
-    local ag = ws.map.Agoal
-    local bg = ws.map.Bgoal
+    local map = ws:FindFirstChild("map")
+    if not map then return end
+    local gkBarrier = map:FindFirstChild("gkbarriar")
+    local a = gkBarrier and gkBarrier:FindFirstChild("Abarriar")
+    local b = gkBarrier and gkBarrier:FindFirstChild("Bbarriar")
+    local ag = map:FindFirstChild("Agoal")
+    local bg = map:FindFirstChild("Bgoal")
 
     if a then a.CanCollide = state end
     if b then b.CanCollide = state end
@@ -3041,16 +3067,16 @@ local function applyNoStun()
     end
 end
 
-local function setupCharacter(char)
+local function setupNoStunCharacter(char)
     if nostunState.enabled then
         applyNoStun()
     end
 end
 
-nostunPlayer.CharacterAdded:Connect(setupCharacter)
+nostunPlayer.CharacterAdded:Connect(setupNoStunCharacter)
 
 if nostunPlayer.Character then
-    setupCharacter(nostunPlayer.Character)
+    setupNoStunCharacter(nostunPlayer.Character)
 end
 
 oth:Toggle("No Stun", "Overrides The Stunned State So You Can Move.", function(v)
@@ -3414,14 +3440,14 @@ local function hookTraps(char)
     end)
 end
 
-local function setupCharacter(char)
+local function setupTrapCharacter(char)
     hookTraps(char)
 end
 
 if player.Character then
-    setupCharacter(player.Character)
+    setupTrapCharacter(player.Character)
 end
-player.CharacterAdded:Connect(setupCharacter)
+player.CharacterAdded:Connect(setupTrapCharacter)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -3786,7 +3812,13 @@ local function updateDashes(dt)
             local baseLook = hrp.CFrame.LookVector
             local right = baseLook:Cross(Vector3.new(0,1,0))
             local offset = dash.offset
-            moveDir = (right * -offset.X + baseLook * offset.Z).Unit
+            local candidate = right * -offset.X + baseLook * offset.Z
+            candidate = Vector3.new(candidate.X, 0, candidate.Z)
+            if candidate.Magnitude > 0.01 then
+                moveDir = candidate.Unit
+            else
+                moveDir = DEFAULT_DIR
+            end
         else
             local look = hrp.CFrame.LookVector
             moveDir = Vector3.new(look.X, 0, look.Z).Unit
@@ -3884,7 +3916,7 @@ local function onAnimationPlayed(track)
     end
 end
 
-local function setupCharacter(char)
+local function setupDistanceCharacter(char)
     local hum = char:WaitForChild("Humanoid", 5)
     if not hum then return end
     local animator = hum:WaitForChild("Animator", 5)
@@ -3895,9 +3927,9 @@ local function setupCharacter(char)
 end
 
 if player.Character then
-    setupCharacter(player.Character)
+    setupDistanceCharacter(player.Character)
 end
-player.CharacterAdded:Connect(setupCharacter)
+player.CharacterAdded:Connect(setupDistanceCharacter)
 
 d:Label("Universal Movement Buffs.")
 d:Slider("Tackle Distance", 0, 0, 75, 1, function(v)
@@ -4207,13 +4239,28 @@ game:GetService("RunService").RenderStepped:Connect(function()
         or (auto_activate_state.bind_key ~= nil and game:GetService("UserInputService"):IsKeyDown(auto_activate_state.bind_key))
 
     if not auto_activate_state.toggle_state or not held_ok or auto_activate_state.db then
-        if game.CoreGui:FindFirstChild("AutoActGui") then
-            game.CoreGui.AutoActGui:Destroy()
+        local coreOk, coreGui = pcall(function()
+            return game:GetService("CoreGui")
+        end)
+        if coreOk and coreGui then
+            local existing = coreGui:FindFirstChild("AutoActGui")
+            if existing then existing:Destroy() end
+        else
+            local playerGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+            if playerGui then
+                local existing = playerGui:FindFirstChild("AutoActGui")
+                if existing then existing:Destroy() end
+            end
         end
         return
     end
 
-    if not game.CoreGui:FindFirstChild("AutoActGui") then
+    local coreOk, coreGui = pcall(function()
+        return game:GetService("CoreGui")
+    end)
+    local parentGui = coreOk and coreGui or game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
+    if not parentGui then return end
+    if not parentGui:FindFirstChild("AutoActGui") then
         local gui = Instance.new("ScreenGui")
         gui.Name = "AutoActGui"
 
@@ -4229,7 +4276,7 @@ game:GetService("RunService").RenderStepped:Connect(function()
         corner.CornerRadius = UDim.new(1, 0)
         corner.Parent = dot
 
-        gui.Parent = game.CoreGui
+        gui.Parent = parentGui
     end
 
     local char = game.Players.LocalPlayer.Character
@@ -4613,6 +4660,7 @@ autoline:Toggle("Sae Line Ups", "Sae's Drive Shot Line Ups.", function(s)
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
+		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -4706,6 +4754,7 @@ autoline:Toggle("Kaiser Line Ups", "Kaiser's Impact Magnus Line Ups.", function(
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
+		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -4797,6 +4846,7 @@ autoline:Toggle("Yukimiya Line Ups", "Yukimiya's Gyro Shot Line Ups.", function(
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
+		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -4896,6 +4946,7 @@ autoline:Toggle("Karasu Line Ups", "Karasu's Dive Bomb Line Ups.", function(kar)
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
+		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -4985,6 +5036,7 @@ autoline:Toggle("Rin Line Ups", "Rin's Curve Shot Line Ups.", function(r)
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
+		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -5058,6 +5110,7 @@ autoline:Toggle("Rin Flow Line Ups", "Rin's Kill Shot Line Ups.", function(k)
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
+		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -5462,9 +5515,11 @@ local function getKey(name)
 end
 
 local justReleasedBall = false
-local ballHolder = ReplicatedStorage.workspace.ballHolder
-local lastHolder = ballHolder.Value
+local ballWorkspace = ReplicatedStorage:FindFirstChild("workspace")
+local ballHolder = ballWorkspace and ballWorkspace:FindFirstChild("ballHolder")
+local lastHolder = ballHolder and ballHolder.Value
 
+if ballHolder then
 holderConn = ballHolder.Changed:Connect(function()
     if Config.AutoD then
         return
@@ -5477,6 +5532,7 @@ holderConn = ballHolder.Changed:Connect(function()
     end
     lastHolder = newHolder
 end)
+end
 
 local indicatorGui = Instance.new("ScreenGui")
 indicatorGui.Parent = game.Players.LocalPlayer.PlayerGui
@@ -5609,7 +5665,7 @@ heartbeatConn = RunService.Heartbeat:Connect(function()
     local hrp = character:FindFirstChild("HumanoidRootPart")
     if not hrp then hideSegments() return end
 
-    if ballHolder.Value == character or ball:IsDescendantOf(character) then
+    if (ballHolder and ballHolder.Value == character) or ball:IsDescendantOf(character) then
         hideSegments()
         return
     end
@@ -5790,10 +5846,11 @@ autogk:Button("Daffy's Auto GK", "Reset Or Click F4 To Disable.", function()
         gkPlayerState.align.Parent = gkPlayerState.hrp
     end
 
-    gkPlayerState.ballHolder = ReplicatedStorage.workspace.ballHolder
-    gkPlayerState.lastHolder = gkPlayerState.ballHolder.Value
+    local gkWorkspace = ReplicatedStorage:FindFirstChild("workspace")
+    gkPlayerState.ballHolder = gkWorkspace and gkWorkspace:FindFirstChild("ballHolder")
+    gkPlayerState.lastHolder = gkPlayerState.ballHolder and gkPlayerState.ballHolder.Value
 
-    gkPlayerState.ballHolder.Changed:Connect(function()
+    if gkPlayerState.ballHolder then gkPlayerState.ballHolder.Changed:Connect(function()
         local cur = gkPlayerState.ballHolder.Value
         if gkPlayerState.lastHolder == gkPlayerState.char and cur == nil then
             gkPlayerState.pause = true
@@ -5803,6 +5860,7 @@ autogk:Button("Daffy's Auto GK", "Reset Or Click F4 To Disable.", function()
         end
         gkPlayerState.lastHolder = cur
     end)
+    end
 
     gkPlayerState.remote = NET
 
@@ -6126,6 +6184,11 @@ st_input_began_conn = user_input_service.InputBegan:Connect(function(input, gpe)
 		st_autotop_held = true
 	end
 end)
+
+-- Forward definitions keep early connections and rebuild calls safe.
+st_hold_end = function() fire_hold = nil end
+st_slow_stop = function() slow_active = false; slow_base = nil; slow_hum = nil end
+st_clear_rings = function() if ring_key then ring_folder:ClearAllChildren(); ring_key = nil end end
 
 st_input_ended_conn = user_input_service.InputEnded:Connect(function(input, gpe)
 	if st_bind_matches(input) then
@@ -7064,11 +7127,16 @@ local othersil = maintab2:Folder("Other Features.", Color3.fromRGB(169, 5, 255),
 othersil:Label("Other Features: Self Explanatory, Other Silent Features.")
 
 local qteState = {
-    enabled = false
+    enabled = false,
+    connection = nil
 }
 
-othersil:Toggle("Auto QuickTimeEvent", "Automatically Does QuickTimeEvents, How Else Can I Explain It?", function()
-qteState.enabled = not qteState.enabled
+othersil:Toggle("Auto QuickTimeEvent", "Automatically Does QuickTimeEvents, How Else Can I Explain It?", function(v)
+if qteState.connection then
+    qteState.connection:Disconnect()
+    qteState.connection = nil
+end
+qteState.enabled = v
 
 local function sendNotification(status)
     if not autoSkillState.suppressNotifs then
@@ -7117,7 +7185,9 @@ local function checkQTE()
     end
 end
 
-game:GetService("RunService").RenderStepped:Connect(checkQTE)
+if qteState.enabled then
+    qteState.connection = game:GetService("RunService").RenderStepped:Connect(checkQTE)
+end
 
 sendNotification(qteState.enabled and "Enabled." or "Disabled.")
 end)
@@ -7216,34 +7286,34 @@ othersil:Toggle("Team Highlighting", "Highlights Your Teammates / Enemies Accord
 end)
 
 getgenv().AutoStealState = getgenv().AutoStealState or { enabled = false, connections = {} } 
-state = getgenv().AutoStealState 
+local autoStealState = getgenv().AutoStealState 
 
 othersil:Toggle("Auto Steal Ball", "Automatically Attempts To Steal When Opponent Whiffs A Counter.", function(v) 
-    Players = game:GetService("Players") 
-    RunService = game:GetService("RunService") 
-    lp = Players.LocalPlayer 
-    state.enabled = v 
-    animId = "rbxassetid://87049473772388" 
+    local Players = game:GetService("Players") 
+    local RunService = game:GetService("RunService") 
+    local lp = Players.LocalPlayer 
+    autoStealState.enabled = v 
+    local animId = "rbxassetid://87049473772388" 
     
-    function getHRP(char) 
+    local function getHRP(char) 
         return char and char:FindFirstChild("HumanoidRootPart") 
     end 
     
-    function stareAt(targetHRP, opponentPlayer) 
-        char = lp.Character 
-        hrp = getHRP(char) 
+    local function stareAt(targetHRP, opponentPlayer) 
+        local char = lp.Character 
+        local hrp = getHRP(char) 
         if not hrp or not targetHRP then return end 
         
         if (hrp.Position - targetHRP.Position).Magnitude > 30 then return end
         
-        start = tick() 
-        conn = RunService.RenderStepped:Connect(function() 
-            if not state.enabled or tick() - start > 0.5 then 
+        local start = tick() 
+        local conn = RunService.RenderStepped:Connect(function() 
+            if not autoStealState.enabled or tick() - start > 0.5 then 
                 conn:Disconnect() 
                 return 
             end 
-            pos = hrp.Position 
-            tpos = targetHRP.Position 
+            local pos = hrp.Position 
+            local tpos = targetHRP.Position 
             hrp.CFrame = CFrame.lookAt(pos, Vector3.new(tpos.X, pos.Y, tpos.Z)) 
 
 			local args = {
@@ -7253,33 +7323,33 @@ othersil:Toggle("Auto Steal Ball", "Automatically Attempts To Steal When Opponen
         end) 
     end 
     
-    function hookCharacter(plr, char) 
-        hum = char:WaitForChild("Humanoid") 
-        animator = hum:WaitForChild("Animator") 
-        conn = animator.AnimationPlayed:Connect(function(track) 
-            if not state.enabled then return end 
+    local function hookCharacter(plr, char) 
+        local hum = char:WaitForChild("Humanoid") 
+        local animator = hum:WaitForChild("Animator") 
+        local conn = animator.AnimationPlayed:Connect(function(track) 
+            if not autoStealState.enabled then return end 
             if track.Animation and track.Animation.AnimationId == animId then 
                 stareAt(getHRP(char), plr) 
             end 
         end) 
-        table.insert(state.connections, conn) 
+        table.insert(autoStealState.connections, conn) 
     end 
     
-    function hookPlayer(plr) 
+    local function hookPlayer(plr) 
         if plr == lp then return end 
         if plr.Character then 
             hookCharacter(plr, plr.Character) 
         end 
-        table.insert(state.connections, plr.CharacterAdded:Connect(function(char) 
+        table.insert(autoStealState.connections, plr.CharacterAdded:Connect(function(char) 
             hookCharacter(plr, char) 
         end)) 
     end 
     
     if not v then 
-        for _, c in ipairs(state.connections) do 
+        for _, c in ipairs(autoStealState.connections) do 
             c:Disconnect() 
         end 
-        table.clear(state.connections) 
+        table.clear(autoStealState.connections) 
         
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "Auto Steal",
@@ -7298,7 +7368,7 @@ othersil:Toggle("Auto Steal Ball", "Automatically Attempts To Steal When Opponen
     for _, p in ipairs(Players:GetPlayers()) do 
         hookPlayer(p) 
     end 
-    table.insert(state.connections, Players.PlayerAdded:Connect(hookPlayer)) 
+    table.insert(autoStealState.connections, Players.PlayerAdded:Connect(hookPlayer)) 
 end)
 
 local cutsceneState = {
@@ -7340,11 +7410,17 @@ local iframeState = {
     activeDots = {},
     dotSize = UDim2.new(0, 6, 0, 6),
     offset = Vector3.new(0, 3, 0),
-    updateInterval = 0.2
+    updateInterval = 0.2,
+    childConnection = nil,
+    loopThread = nil
 }
 
-othersil:Toggle("IFrame Indicator", "Shows The I-Frame Status Of All Players. (Green = Off, Red = On.)", function()
-    iframeState.enabled = not iframeState.enabled
+othersil:Toggle("IFrame Indicator", "Shows The I-Frame Status Of All Players. (Green = Off, Red = On.)", function(v)
+    if iframeState.childConnection then
+        iframeState.childConnection:Disconnect()
+        iframeState.childConnection = nil
+    end
+    iframeState.enabled = v
 
     local StarterGui = game:GetService("StarterGui")
     StarterGui:SetCore("SendNotification", {
@@ -7400,13 +7476,13 @@ othersil:Toggle("IFrame Indicator", "Shows The I-Frame Status Of All Players. (G
         for _, char in ipairs(charactersFolder:GetChildren()) do
             createDot(char)
         end
-        charactersFolder.ChildAdded:Connect(function(char)
+        iframeState.childConnection = charactersFolder.ChildAdded:Connect(function(char)
             task.wait(0.5)
             if iframeState.enabled then
                 createDot(char)
             end
         end)
-        task.spawn(function()
+        iframeState.loopThread = task.spawn(function()
             while iframeState.enabled do
                 for char, dot in pairs(iframeState.activeDots) do
                     if char and dot then
@@ -7538,7 +7614,7 @@ local mobform = {
     active = false
 }
 
-local function trigger()
+local function triggerFormless()
     if game:GetService("UserInputService").MouseBehavior ~= Enum.MouseBehavior.LockCenter then return end
     local lp = game:GetService("Players").LocalPlayer
     local char = lp.Character
@@ -7583,7 +7659,7 @@ local function trigger()
     NET:FireServer(buffer.fromstring(buffers["base"]), { { "skill1" } })
 end
 
-local function makeDraggable(frame)
+local function makeDraggableFormless(frame)
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -7649,9 +7725,9 @@ local function show()
         btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
     end)
 
-    btn.Activated:Connect(trigger)
+    btn.Activated:Connect(triggerFormless)
 
-    makeDraggable(btn)
+    makeDraggableFormless(btn)
 end
 
 local function hide()
@@ -7676,7 +7752,7 @@ local airDribble = {
     enabled = true
 }
 
-local function trigger()
+local function triggerAirDribble()
     if not airDribble.enabled then return end
     local char = game:GetService("Players").LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -7696,7 +7772,7 @@ local function trigger()
     )
 end
 
-local function makeDraggable(frame)
+local function makeDraggableAir(frame)
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -7751,8 +7827,8 @@ local function show()
 
     btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35) end)
     btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15) end)
-    btn.Activated:Connect(trigger)
-    makeDraggable(btn)
+    btn.Activated:Connect(triggerAirDribble)
+    makeDraggableAir(btn)
 end
 
 local function hide()
@@ -7796,7 +7872,7 @@ local function normalizeKey(key)
     return key:sub(1,1):upper() .. key:sub(2)
 end
 
-local function makeDraggable(frame)
+local function makeMobileDraggable(frame)
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -7881,7 +7957,7 @@ mobilessss:Button("Create Mobile PC Key", "Creates A Mobile PC Key.", function()
         end
     end)
 
-    makeDraggable(btn)
+    makeMobileDraggable(btn)
     table.insert(getgenv().MobileKeySystem.buttons, sg)
 end)
 
@@ -8760,7 +8836,16 @@ exploittab:Toggle("Anti AFK", function()
 	})
 end)
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Scripts/refs/heads/main/oldthingyep",true))()
-loadstring(game:HttpGet("https://pastebin.com/raw/rQMS2B9R",true))()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/owner_anti_abuse_from_users"))()
+pcall(function()
+    local source = game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Scripts/refs/heads/main/oldthingyep", true)
+    loadstring(source)()
+end)
+pcall(function()
+    local source = game:HttpGet("https://pastebin.com/raw/rQMS2B9R", true)
+    loadstring(source)()
+end)
+pcall(function()
+    local source = game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/owner_anti_abuse_from_users")
+    loadstring(source)()
+end)
 end
