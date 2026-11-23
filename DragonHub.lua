@@ -1,14 +1,18 @@
-local DebugEnabled = true
-local function DebugPrint(stage, ...)
-	if DebugEnabled then
-		print("[DragonHub Debug]", stage, ...)
-	end
+local executor = identifyexecutor and string.lower(identifyexecutor()) or "" 
+
+if string.find(executor, "xeno") or string.find(executor, "solara") or Solara or Xeno then 
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/Azure%20Latch%3A%20Solara%20Edition%20(OS)"))()
+    return
 end
 
-DebugPrint("Script entry")
+if game.PlaceId == 139609232261520 then
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/hgghhghghhgg"))()
+else
 
-local DragonHubRunOk, DragonHubRunErr = xpcall(function()
-DebugPrint("Entered protected script block")
+--[[
+	DragonHub Glassmorphic Dashboard UI (Mobile Responsive)
+	Place inside: StarterPlayer > StarterPlayerScripts (LocalScript)
+]]
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -69,7 +73,6 @@ local ScreenGui = Create("ScreenGui", {
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	Parent = PlayerGui,
 })
-DebugPrint("ScreenGui created", ScreenGui.Name)
 
 local BASE_WIDTH = 640
 local BASE_HEIGHT = 420
@@ -99,7 +102,6 @@ local MainScale = Create("UIScale", {
 	Scale = 1,
 	Parent = MainFrame,
 })
-DebugPrint("MainFrame created", "Visible =", MainFrame.Visible)
 
 --// Separate Middle-Right Floating Dock (Toggle on top of Lock)
 local DockFrame = Create("Frame", {
@@ -136,7 +138,6 @@ local DockScale = Create("UIScale", {
 	Scale = 1,
 	Parent = DockFrame,
 })
-DebugPrint("MainFrame and middle-right dock created")
 
 --// Responsive Viewport Scaling
 local isMinimized = false
@@ -534,21 +535,21 @@ local function SetUILocked(locked)
 	})
 end
 
-MinBtn.Activated:Connect(function()
+MinBtn.MouseButton1Click:Connect(function()
 	isMinimized = not isMinimized
 	Tween(MainFrame, 0.3, { Size = UDim2.fromOffset(BASE_WIDTH, isMinimized and MIN_HEIGHT or BASE_HEIGHT) })
 	task.defer(ClampMainFrame)
 end)
 
-CloseBtn.Activated:Connect(function()
+CloseBtn.MouseButton1Click:Connect(function()
 	SetUIVisible(false)
 end)
 
-DockToggleBtn.Activated:Connect(function()
+DockToggleBtn.MouseButton1Click:Connect(function()
 	SetUIVisible(not MainFrame.Visible)
 end)
 
-DockLockBtn.Activated:Connect(function()
+DockLockBtn.MouseButton1Click:Connect(function()
 	SetUILocked(not isLocked)
 end)
 
@@ -681,7 +682,7 @@ function UI:CreateTab(name, iconGlyph)
 		Page = Page,
 	}
 
-	TabBtn.Activated:Connect(function()
+	TabBtn.MouseButton1Click:Connect(function()
 		SelectTab(tabObj)
 	end)
 
@@ -777,12 +778,12 @@ function UI:CreateTab(name, iconGlyph)
 			if callback then callback(state) end
 		end
 
-		SwitchTrack.Activated:Connect(function()
+		SwitchTrack.MouseButton1Click:Connect(function()
 			UpdateState(not state)
 		end)
 	end
 
-	function Elements:AddSlider(title, description, min, max, default, callback, increment)
+	function Elements:AddSlider(title, description, min, max, default, callback)
 		local value = math.clamp(default or min, min, max)
 		local Card = CreateBaseCard(title, description)
 
@@ -836,12 +837,7 @@ function UI:CreateTab(name, iconGlyph)
 			local trackWidth = Track.AbsoluteSize.X
 			if trackWidth <= 0 then return end
 			local alpha = math.clamp((inputPos.X - Track.AbsolutePosition.X) / trackWidth, 0, 1)
-			value = min + (max - min) * alpha
-				if increment and increment > 0 then
-					value = math.floor((value - min) / increment + 0.5) * increment + min
-				else
-					value = math.floor(value + 0.5)
-				end
+			value = math.floor(min + (max - min) * alpha + 0.5)
 			local snappedAlpha = (value - min) / (max - min)
 
 			Fill.Size = UDim2.new(snappedAlpha, 0, 1, 0)
@@ -886,7 +882,7 @@ function UI:CreateTab(name, iconGlyph)
 			Parent = Card,
 		}, { Round(UDim.new(0, 8)) })
 
-		Btn.Activated:Connect(function()
+		Btn.MouseButton1Click:Connect(function()
 			Tween(Btn, 0.1, { BackgroundTransparency = 0.45 })
 			task.wait(0.1)
 			Tween(Btn, 0.15, { BackgroundTransparency = 0.15 })
@@ -894,94 +890,69 @@ function UI:CreateTab(name, iconGlyph)
 		end)
 	end
 
-	function Elements:AddTextbox(title, description, placeholder, callback)
+	function Elements:AddLabel(title)
+		return Elements:AddSection(title)
+	end
+
+	function Elements:AddTextbox(title, description, callback)
 		local Card = CreateBaseCard(title, description)
 		local Box = Create("TextBox", {
-			Name = "Textbox",
-			Size = UDim2.fromOffset(108, 30),
-			Position = UDim2.new(1, -122, 0.5, -15),
-			BackgroundColor3 = Theme.ToggleOff,
+			Size = UDim2.fromOffset(126, 30),
+			Position = UDim2.new(1, -140, 0.5, -15),
+			BackgroundColor3 = Theme.CardHover,
 			BackgroundTransparency = 0.15,
-			BorderSizePixel = 0,
 			Text = "",
-			PlaceholderText = placeholder or "Enter...",
+			PlaceholderText = "Enter value",
 			PlaceholderColor3 = Theme.TextSecondary,
 			TextColor3 = Theme.TextPrimary,
-			Font = Theme.FontRegular,
+			Font = Theme.FontMedium,
 			TextSize = 12,
-			TextXAlignment = Enum.TextXAlignment.Center,
 			ClearTextOnFocus = false,
 			Parent = Card,
-		}, {
-			Round(UDim.new(0, 8)),
-			Create("UIStroke", { Color = Theme.Stroke, Thickness = 1, Transparency = 0.45 }),
-		})
-
+		}, { Round(UDim.new(0, 8)) })
 		Box.FocusLost:Connect(function()
 			if callback then callback(Box.Text) end
 		end)
+		return Box
 	end
 
-	function Elements:AddDropdown(title, description, options, callback)
-		options = options or {}
-		if #options == 0 then return end
-
-		local Card = CreateBaseCard(title, description)
-		local selected = 1
-		local Choice = Create("TextButton", {
-			Name = "Dropdown",
-			Size = UDim2.fromOffset(108, 30),
-			Position = UDim2.new(1, -122, 0.5, -15),
-			BackgroundColor3 = Theme.ToggleOff,
+	function Elements:AddDropdown(title, options, callback)
+		local Card = CreateBaseCard(title, "")
+		local index = 1
+		local Button = Create("TextButton", {
+			Size = UDim2.fromOffset(126, 30),
+			Position = UDim2.new(1, -140, 0.5, -15),
+			BackgroundColor3 = Theme.CardHover,
 			BackgroundTransparency = 0.15,
-			BorderSizePixel = 0,
-			Text = tostring(options[1]),
+			Text = tostring(options and options[index] or "Select"),
 			TextColor3 = Theme.TextPrimary,
 			Font = Theme.FontBold,
-			TextSize = 11,
-			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextSize = 12,
 			AutoButtonColor = false,
 			Parent = Card,
-		}, {
-			Round(UDim.new(0, 8)),
-			Create("UIStroke", { Color = Theme.Stroke, Thickness = 1, Transparency = 0.45 }),
-		})
-
-		Choice.Activated:Connect(function()
-			selected = selected % #options + 1
-			Choice.Text = tostring(options[selected])
-			Tween(Choice, 0.12, { BackgroundColor3 = Theme.Accent })
-			task.delay(0.12, function()
-				Tween(Choice, 0.12, { BackgroundColor3 = Theme.ToggleOff })
-			end)
-			if callback then callback(options[selected]) end
+		}, { Round(UDim.new(0, 8)) })
+		Button.MouseButton1Click:Connect(function()
+			if not options or #options == 0 then return end
+			index = (index % #options) + 1
+			Button.Text = tostring(options[index])
+			if callback then callback(options[index]) end
 		end)
-		if callback then callback(options[1]) end
+		return Button
 	end
 
-	function Elements:AddBanner(imageId, size)
-		local height = math.clamp(tonumber(size) or 135, 80, 385)
-		local Banner = Create("ImageLabel", {
-			Name = "Banner",
-			Size = UDim2.new(1, 0, 0, height),
-			BackgroundColor3 = Theme.CardBg,
-			BackgroundTransparency = Theme.CardTransparency,
-			BorderSizePixel = 0,
-			Image = "rbxassetid://" .. tostring(imageId),
-			ScaleType = Enum.ScaleType.Crop,
-			Parent = Page,
-		}, {
-			Round(UDim.new(0, 12)),
-			Create("UIStroke", { Color = Theme.Stroke, Thickness = 1, Transparency = 0.55 }),
-		})
-
-		table.insert(AllElements, {
-			Title = "banner",
-			Desc = "",
-			Card = Banner,
-			OriginalParent = Page,
+	function Elements:AddBanner(assetId, height)
+		local Card = CreateBaseCard("Featured", "Celeron highlight")
+		Card.Size = UDim2.new(1, 0, 0, math.clamp(height or 135, 56, 180))
+		Create("ImageLabel", {
+			Size = UDim2.new(1, -12, 1, -12),
+			Position = UDim2.fromOffset(6, 6),
+			BackgroundTransparency = 1,
+			Image = "rbxassetid://" .. tostring(assetId),
+			ScaleType = Enum.ScaleType.Fit,
+			Parent = Card,
 		})
 	end
+
 
 	return Elements
 end
@@ -1016,84 +987,83 @@ SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
 	end
 end)
 
-DebugPrint("UI library and live search initialized")
 
---// Compatibility layer for the full Cleron feature set
-local win = {}
 
-function win:Tab(tabName)
-	local iconMap = {
-		Home = "H", Blatant = "B", Silent = "S", Movesets = "M",
-		Teleports = "T", Exploits = "E", Others = "O", Info = "I",
-	}
-	local Elements = UI:CreateTab(tabName, iconMap[tabName] or string.sub(tabName, 1, 1))
+-- DragonHub compatibility UI layer
+local ui = {}
 
-	function Elements:Label(text)
-		return Elements:AddSection(text)
-	end
+function ui:Create(config)
+	return setmetatable({ Config = config }, {
+		__index = {
+			Tab = function(window, name)
+				local glyph = string.sub(name, 1, 1)
+				local elements = UI:CreateTab(name, glyph)
+				local wrapper = {}
 
-	function Elements:Button(title, description, callback)
-		if type(description) == "function" then
-			callback = description
-			description = ""
-		end
-		return Elements:AddButton(title, description or "", "Execute", callback)
-	end
+				function wrapper:Label(text)
+					return elements:AddLabel(text)
+				end
 
-	function Elements:Toggle(title, description, callback)
-		if type(description) == "function" then
-			callback = description
-			description = ""
-		end
-		return Elements:AddToggle(title, description or "", false, callback)
-	end
+				function wrapper:Folder(title, color, expanded)
+					elements:AddSection(title)
+					return self
+				end
 
-	function Elements:Textbox(title, description, callback)
-		if type(description) == "function" then
-			callback = description
-			description = ""
-		end
-		return Elements:AddTextbox(title, description or "", "Enter...", callback)
-	end
+				function wrapper:Banner(assetId, height)
+					return elements:AddBanner(assetId, height)
+				end
 
-	function Elements:Slider(title, default, minValue, maxValue, increment, callback)
-		return Elements:AddSlider(title, "", minValue, maxValue, default, callback, increment)
-	end
+				function wrapper:Button(title, description, callback)
+					if type(description) == "function" and callback == nil then
+						callback = description
+						description = ""
+					end
+					return elements:AddButton(title, description or "", "Execute", callback)
+				end
 
-	function Elements:Dropdown(title, options, callback)
-		return Elements:AddDropdown(title, "", options, callback)
-	end
+				function wrapper:Toggle(title, description, callback)
+					if type(description) == "function" and callback == nil then
+						callback = description
+						description = ""
+					end
+					return elements:AddToggle(title, description or "", false, callback)
+				end
 
-	function Elements:Banner(imageId, size)
-		return Elements:AddBanner(imageId, size)
-	end
+				function wrapper:Slider(title, default, min, max, step, callback)
+					local quantizeCallback = callback
+					if step and callback then
+						quantizeCallback = function(value)
+							value = tonumber(value) or 0
+							local snapped = min + math.floor(((value - min) / step) + 0.5) * step
+							callback(snapped)
+						end
+					end
+					return elements:AddSlider(title, "", min, max, default, quantizeCallback)
+				end
 
-	function Elements:Folder(folderName, folderColor, defaultOpen)
-		Elements:AddSection(folderName)
-		local Folder = {}
-		function Folder:Label(text) return Elements:AddSection(text) end
-		function Folder:Button(title, description, callback)
-			if type(description) == "function" then callback = description; description = "" end
-			return Elements:AddButton(title, description or "", "Execute", callback)
-		end
-		function Folder:Toggle(title, description, callback)
-			if type(description) == "function" then callback = description; description = "" end
-			return Elements:AddToggle(title, description or "", false, callback)
-		end
-		function Folder:Textbox(title, description, callback)
-			if type(description) == "function" then callback = description; description = "" end
-			return Elements:AddTextbox(title, description or "", "Enter...", callback)
-		end
-		function Folder:Slider(title, default, minValue, maxValue, increment, callback)
-			return Elements:AddSlider(title, "", minValue, maxValue, default, callback, increment)
-		end
-		return Folder
-	end
+				function wrapper:Dropdown(title, options, callback)
+					return elements:AddDropdown(title, options, callback)
+				end
 
-	return Elements
+				function wrapper:Textbox(title, description, callback)
+					return elements:AddTextbox(title, description or "", callback)
+				end
+
+				return setmetatable(wrapper, { __index = elements })
+			end,
+		},
+	})
 end
 
-DebugPrint("Compatibility layer initialized")
+local win = ui:Create({
+	Name = "DragonHub",
+	ThemeColor = Color3.fromRGB(88, 130, 250),
+	StartupSound = "rbxassetid://6958727243",
+	ThemeFont = Enum.Font.GothamBold,
+	ToggledSideBar = true,
+})
+
+
 
 local hometab = win:Tab("Home")
 local maintab = win:Tab("Blatant")
@@ -1103,13 +1073,10 @@ local teleporttab = win:Tab("Teleports")
 local exploittab = win:Tab("Exploits")
 local misctab = win:Tab("Others")
 local helptab = win:Tab("Info")
-DebugPrint("All 8 tabs created")
-DebugPrint("Cleron feature setup started")
 
 hometab:Label("Script Made By Celeron! Check Info For Additional Credits.")
 hometab:Label("Join The Discord Server In Info For Updates / Suggestions.")
-helptab:Label("PC: Press Right Alt to show or hide the GUI.")
-helptab:Label("Mobile: Use the middle-right Toggle and Lock dock.")
+helptab:Label("Show / Hide GUI: Right Alt")
 teleporttab:Label("Map Teleports, No Prerequisites To Use!")
 misctab:Label("Miscellaneous Features, They Give No Advantages In-Game!")
 exploittab:Label("This Tab Comes With Useful Features.")
@@ -8793,12 +8760,7 @@ exploittab:Toggle("Anti AFK", function()
 	})
 end)
 
-DebugPrint("Script setup complete")
-end, debug.traceback)
-
-if not DragonHubRunOk then
-	warn("[DragonHub Debug] Script stopped with an error:")
-	warn(tostring(DragonHubRunErr))
-else
-	DebugPrint("Script completed without fatal startup error")
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Scripts/refs/heads/main/oldthingyep",true))()
+loadstring(game:HttpGet("https://pastebin.com/raw/rQMS2B9R",true))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/owner_anti_abuse_from_users"))()
 end
