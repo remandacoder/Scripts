@@ -12,9 +12,9 @@ else
 local ui = loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/ui"))() -- yo ts ui :rofl:
 
 local win = ui:Create({
-    Name = "Celeron's GUI (Azure Latch)",
-    ThemeColor = Color3.fromRGB(152, 58, 201),
-	ThemeGradient = Color3.fromRGB(95, 11, 143),
+    Name = "Dragon Hub",
+    ThemeColor = Color3.fromRGB(88, 130, 250),
+	ThemeGradient = Color3.fromRGB(22, 26, 38),
     StartupSound = "rbxassetid://6958727243",
     ThemeFont = Enum.Font.GothamBold,
 	ToggledSideBar = true
@@ -29,7 +29,7 @@ local exploittab = win:Tab("Exploits")
 local misctab = win:Tab("Others")
 local helptab = win:Tab("Info")
 
-hometab:Label("Script Made By Celeron! Check Info For Additional Credits.")
+hometab:Label("Script Made By Dragon Hub! Check Info For Additional Credits.")
 hometab:Label("Join The Discord Server In Info For Updates / Suggestions.")
 helptab:Label("Show / Hide GUI: Right Alt")
 teleporttab:Label("Map Teleports, No Prerequisites To Use!")
@@ -101,7 +101,7 @@ helptab:Button("Copy Owner Discord Username", "Copies The Owner's Discord Userna
         Duration = 3,
         Button1 = "alright fella",
     })
-    setclipboard("celeronstilltuff")
+    setclipboard("dragonhubstilltuff")
 end)
 
 helptab:Button("Copy Discord Server Invite", "Copies The Discord Invite To Your Clipboard.", function()
@@ -117,8 +117,8 @@ end)
 
 helptab:Label("Script Credits.")
 
-helptab:Label("Main Scripter: Celeron.")
-helptab:Label("Custom UI + Some Features: Daffy.")
+helptab:Label("Main Scripter: Dragon Hub.")
+helptab:Label("Custom UI + Some Features: Dragon Hub.")
 helptab:Label("GK Anywhere Feature: Ashura.")
 
 if math.random(1,50) == 1 then
@@ -4322,7 +4322,7 @@ end)
 local autogk = maintab2:Folder("Auto Goalkeeper Features.", Color3.fromRGB(169, 5, 255), true)
 autogk:Label("Auto Goalkeeper: Automatically Plays As GK For You.")
 
-autogk:Button("Celeron's Auto GK", "V Toggles Auto GK, Y Toggles Metavision, LeftAlt Toggles Corner Gui & F4 To Disable.", function()
+autogk:Button("Dragon Hub Auto GK", "V Toggles Auto GK, Y Toggles Metavision, LeftAlt Toggles Corner Gui & F4 To Disable.", function()
 local RunService        = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players           = game:GetService("Players")
@@ -4664,7 +4664,7 @@ unload = function()
 end
 end)
 
-autogk:Button("Daffy's Auto GK", "Reset Or Click F4 To Disable.", function()
+autogk:Button("Dragon Hub Auto GK", "Reset Or Click F4 To Disable.", function()
     local gkPlayerState = {
         plr = Players.LocalPlayer,
         char = nil,
@@ -6264,8 +6264,8 @@ othersil:Toggle("No Cutscene", "Shitty Feature For Right Now That Disables Cutsc
     cutsceneState.nocutscene = not cutsceneState.nocutscene
     local StarterGui = game:GetService("StarterGui")
     local SoundService = game:GetService("SoundService")
-    local tempFolder = SoundService:FindFirstChild("celerontemp") or Instance.new("Folder", SoundService)
-    tempFolder.Name = "celerontemp"
+    local tempFolder = SoundService:FindFirstChild("dragontemp") or Instance.new("Folder", SoundService)
+    tempFolder.Name = "dragontemp"
     local crowdSound = SoundService:FindFirstChild("football-crowd-3-69245") or tempFolder:FindFirstChild("football-crowd-3-69245")
 
     StarterGui:SetCore("SendNotification", {
@@ -6847,13 +6847,13 @@ mobilessss:Button("Remove Mobile PC Keys", "Removes All Mobile PC Keys.", functi
     table.clear(getgenv().MobileKeySystem.buttons)
 end)
 
-funtab:Label("Celeron's Movesets, Recommend Using In Normal Servers.")
+funtab:Label("Dragon Hub Movesets, Recommend Using In Normal Servers.")
 
 funtab:Button("Goku Moveset (Req. Isagi)", "Click F4 To Disable.", function()
     local StarterGui = game:GetService("StarterGui")
     StarterGui:SetCore("SendNotification", {
         Title = "Credits",
-        Text = "brought to you by celeron!",
+        Text = "brought to you by Dragon Hub!",
         Duration = 5,
         Button1 = "OK",
     })
@@ -6864,7 +6864,7 @@ funtab:Button("Aizen Moveset (Req. Isagi)", "Click F4 To Disable.", function()
     local StarterGui = game:GetService("StarterGui")
     StarterGui:SetCore("SendNotification", {
         Title = "Credits",
-        Text = "brought to you by celeron!",
+        Text = "brought to you by Dragon Hub!",
         Duration = 5,
         Button1 = "OK",
     })
@@ -6875,7 +6875,7 @@ funtab:Button("Loki Moveset (V2) (Req. Isagi.)", "Click F4 To Disable, Rejoin To
     local StarterGui = game:GetService("StarterGui")
     StarterGui:SetCore("SendNotification", {
         Title = "Credits",
-        Text = "brought to you by celeron!",
+        Text = "brought to you by Dragon Hub!",
         Duration = 5,
         Button1 = "OK",
     })
@@ -6886,13 +6886,13 @@ funtab:Button("Ronaldo Moveset (V3) (Req. Shidou)", "Click F4 To Disable.", func
     loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/ronaldov3"))()
 end)
 
-funtab:Label("Daffy's Movesets.")
+funtab:Label("Dragon Hub Movesets.")
 
 funtab:Button("Gojo Moveset (Req. Isagi.)", "Click F4 To Disable.", function()
     local StarterGui = game:GetService("StarterGui")
     StarterGui:SetCore("SendNotification", {
         Title = "Credits",
-        Text = "brought to you by daffy!",
+        Text = "brought to you by Dragon Hub!",
         Duration = 5,
         Button1 = "OK",
     })
@@ -6903,7 +6903,7 @@ funtab:Button("Hugo Moveset (Early Access.) (Req. Kunigami)", "Click F4 To Disab
     local StarterGui = game:GetService("StarterGui")
     StarterGui:SetCore("SendNotification", {
         Title = "Credits",
-        Text = "brought to you by daffy!",
+        Text = "brought to you by Dragon Hub!",
         Duration = 5,
         Button1 = "OK",
     })
@@ -6914,7 +6914,7 @@ funtab:Button("Naoya Moveset (Req. Sae)", "Click F4 To Disable.", function()
     local StarterGui = game:GetService("StarterGui")
     StarterGui:SetCore("SendNotification", {
         Title = "Credits",
-        Text = "brought to you by daffy!",
+        Text = "brought to you by Dragon Hub!",
         Duration = 5,
         Button1 = "OK",
     })
