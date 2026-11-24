@@ -9,1068 +9,16 @@ if game.PlaceId == 139609232261520 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/hgghhghghhgg"))()
 else
 
---[[
-	DragonHub Glassmorphic Dashboard UI (Mobile Responsive)
-	Place inside: StarterPlayer > StarterPlayerScripts (LocalScript)
-]]
-
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
---// Theme Configuration (Navy Glassmorphism)
-local Theme = {
-	MainBg = Color3.fromRGB(22, 26, 38),
-	SidebarBg = Color3.fromRGB(17, 20, 30),
-	CardBg = Color3.fromRGB(30, 35, 50),
-	CardHover = Color3.fromRGB(36, 42, 60),
-	Accent = Color3.fromRGB(88, 130, 250),
-	Stroke = Color3.fromRGB(52, 60, 82),
-	TextPrimary = Color3.fromRGB(245, 247, 252),
-	TextSecondary = Color3.fromRGB(150, 158, 180),
-	ToggleOff = Color3.fromRGB(48, 54, 74),
-	MainTransparency = 0.14,
-	CardTransparency = 0.25,
-	FontBold = Enum.Font.GothamBold,
-	FontMedium = Enum.Font.GothamMedium,
-	FontRegular = Enum.Font.Gotham,
-}
-
---// Utility Functions
-local function Create(className, props, children)
-	local inst = Instance.new(className)
-	for k, v in pairs(props or {}) do
-		inst[k] = v
-	end
-	for _, child in ipairs(children or {}) do
-		child.Parent = inst
-	end
-	return inst
-end
-
-local function Round(radius)
-	return Create("UICorner", { CornerRadius = radius or UDim.new(0, 10) })
-end
-
-local function Tween(obj, time, props)
-	local info = TweenInfo.new(time, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-	local t = TweenService:Create(obj, info, props)
-	t:Play()
-	return t
-end
-
---// Main ScreenGui
-if PlayerGui:FindFirstChild("DragonHubUI") then
-	PlayerGui.DragonHubUI:Destroy()
-end
-
-local ScreenGui = Create("ScreenGui", {
-	Name = "DragonHubUI",
-	ResetOnSpawn = false,
-	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-	Parent = PlayerGui,
-})
-
-local BASE_WIDTH = 640
-local BASE_HEIGHT = 420
-local MIN_HEIGHT = 56
-
---// Main Floating Window
-local MainFrame = Create("Frame", {
-	Name = "MainFrame",
-	Size = UDim2.fromOffset(BASE_WIDTH, BASE_HEIGHT),
-	Position = UDim2.new(0.5, -BASE_WIDTH / 2, 0.5, -BASE_HEIGHT / 2),
-	BackgroundColor3 = Theme.MainBg,
-	BackgroundTransparency = Theme.MainTransparency,
-	BorderSizePixel = 0,
-	ClipsDescendants = true,
-	Visible = true,
-	Parent = ScreenGui,
-}, {
-	Round(UDim.new(0, 16)),
-	Create("UIStroke", {
-		Color = Theme.Stroke,
-		Thickness = 1,
-		Transparency = 0.35,
-	}),
-})
-
-local MainScale = Create("UIScale", {
-	Scale = 1,
-	Parent = MainFrame,
-})
-
---// Separate Middle-Right Floating Dock (Toggle on top of Lock)
-local DockFrame = Create("Frame", {
-	Name = "MiddleRightDock",
-	Size = UDim2.fromOffset(82, 74),
-	Position = UDim2.new(1, -96, 0.5, -37),
-	BackgroundColor3 = Theme.MainBg,
-	BackgroundTransparency = Theme.MainTransparency,
-	BorderSizePixel = 0,
-	Parent = ScreenGui,
-}, {
-	Round(UDim.new(0, 12)),
-	Create("UIStroke", {
-		Color = Theme.Stroke,
-		Thickness = 1,
-		Transparency = 0.35,
-	}),
-	Create("UIPadding", {
-		PaddingTop = UDim.new(0, 7),
-		PaddingBottom = UDim.new(0, 7),
-		PaddingLeft = UDim.new(0, 7),
-		PaddingRight = UDim.new(0, 7),
-	}),
-	Create("UIListLayout", {
-		FillDirection = Enum.FillDirection.Vertical,
-		HorizontalAlignment = Enum.HorizontalAlignment.Center,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-		Padding = UDim.new(0, 6),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	}),
-})
-
-local DockScale = Create("UIScale", {
-	Scale = 1,
-	Parent = DockFrame,
-})
-
---// Responsive Viewport Scaling
-local isMinimized = false
-
-local function ClampMainFrame()
-	local camera = workspace.CurrentCamera
-	if not camera then return end
-	local vp = camera.ViewportSize
-	local scale = MainScale.Scale
-	local currentHeight = isMinimized and MIN_HEIGHT or BASE_HEIGHT
-	local scaledW = BASE_WIDTH * scale
-	local scaledH = currentHeight * scale
-
-	local x = MainFrame.Position.X.Scale * vp.X + MainFrame.Position.X.Offset
-	local y = MainFrame.Position.Y.Scale * vp.Y + MainFrame.Position.Y.Offset
-
-	local maxX = math.max(8, vp.X - scaledW - 8)
-	local maxY = math.max(8, vp.Y - scaledH - 8)
-
-	local clampedX = math.clamp(x, 8, maxX)
-	local clampedY = math.clamp(y, 8, maxY)
-
-	MainFrame.Position = UDim2.fromOffset(clampedX, clampedY)
-end
-
-local function UpdateResponsiveLayout()
-	local camera = workspace.CurrentCamera
-	if not camera then return end
-	local vp = camera.ViewportSize
-	if vp.X <= 0 or vp.Y <= 0 then return end
-
-	local reserveRight = UserInputService.TouchEnabled and 82 or 96
-	local availW = math.max(240, vp.X - reserveRight - 16)
-	local availH = math.max(200, vp.Y - 24)
-
-	local fitScale = math.min(availW / BASE_WIDTH, availH / BASE_HEIGHT, 1)
-	MainScale.Scale = math.clamp(fitScale, 0.5, 1)
-
-	local dockFitScale = math.min((vp.Y - 24) / 74, (vp.X * 0.22) / 82, 1)
-	DockScale.Scale = math.clamp(dockFitScale, 0.7, 1)
-
-	local scaledDockW = 82 * DockScale.Scale
-	local scaledDockH = 74 * DockScale.Scale
-	local dockRightMargin = UserInputService.TouchEnabled and 6 or 14
-	DockFrame.Position = UDim2.fromOffset(
-		math.max(6, vp.X - scaledDockW - dockRightMargin),
-		math.max(6, (vp.Y - scaledDockH) * 0.5)
-	)
-
-	ClampMainFrame()
-end
-
-do
-	local camera = workspace.CurrentCamera
-	if camera then
-		camera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateResponsiveLayout)
-	end
-	workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-		local newCam = workspace.CurrentCamera
-		if newCam then
-			newCam:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateResponsiveLayout)
-			UpdateResponsiveLayout()
-		end
-	end)
-	UpdateResponsiveLayout()
-end
-
---// Left Sidebar
-local Sidebar = Create("Frame", {
-	Name = "Sidebar",
-	Size = UDim2.new(0, 185, 1, 0),
-	BackgroundColor3 = Theme.SidebarBg,
-	BackgroundTransparency = 0.2,
-	BorderSizePixel = 0,
-	Parent = MainFrame,
-}, {
-	Round(UDim.new(0, 16)),
-	Create("Frame", {
-		Size = UDim2.new(0, 1, 1, 0),
-		Position = UDim2.new(1, -1, 0, 0),
-		BackgroundColor3 = Theme.Stroke,
-		BackgroundTransparency = 0.5,
-		BorderSizePixel = 0,
-	}, { Round(UDim.new(1, 0)) })
-})
-
---// Brand Header (Top-Left)
-local HeaderFrame = Create("Frame", {
-	Size = UDim2.new(1, -24, 0, 44),
-	Position = UDim2.fromOffset(14, 12),
-	BackgroundTransparency = 1,
-	Parent = Sidebar,
-}, {
-	Round(UDim.new(0, 8)),
-	Create("TextLabel", {
-		Size = UDim2.new(1, 0, 0, 22),
-		BackgroundTransparency = 1,
-		Text = "DragonHub",
-		TextColor3 = Theme.TextPrimary,
-		Font = Theme.FontBold,
-		TextSize = 17,
-		TextXAlignment = Enum.TextXAlignment.Left,
-	}),
-	Create("TextLabel", {
-		Size = UDim2.new(1, 0, 0, 16),
-		Position = UDim2.fromOffset(0, 21),
-		BackgroundTransparency = 1,
-		Text = "Dashboard v2.4 • RightAlt",
-		TextColor3 = Theme.TextSecondary,
-		Font = Theme.FontRegular,
-		TextSize = 12,
-		TextXAlignment = Enum.TextXAlignment.Left,
-	}),
-})
-
---// Search Bar with Magnifying Glass Icon
-local SearchContainer = Create("Frame", {
-	Name = "SearchContainer",
-	Size = UDim2.new(1, -24, 0, 34),
-	Position = UDim2.fromOffset(12, 64),
-	BackgroundColor3 = Theme.CardBg,
-	BackgroundTransparency = 0.2,
-	Parent = Sidebar,
-}, {
-	Round(UDim.new(0, 10)),
-	Create("UIStroke", { Color = Theme.Stroke, Thickness = 1, Transparency = 0.4 }),
-})
-
-Create("Frame", {
-	Size = UDim2.fromOffset(16, 16),
-	Position = UDim2.new(0, 10, 0.5, -8),
-	BackgroundTransparency = 1,
-	Parent = SearchContainer,
-}, {
-	Create("Frame", {
-		Size = UDim2.fromOffset(10, 10),
-		Position = UDim2.fromOffset(1, 1),
-		BackgroundTransparency = 1,
-	}, {
-		Round(UDim.new(1, 0)),
-		Create("UIStroke", { Color = Theme.TextSecondary, Thickness = 1.6 }),
-	}),
-	Create("Frame", {
-		Size = UDim2.fromOffset(5, 2),
-		Position = UDim2.fromOffset(9, 11),
-		Rotation = 45,
-		BackgroundColor3 = Theme.TextSecondary,
-		BorderSizePixel = 0,
-	}, {
-		Round(UDim.new(1, 0)),
-	})
-})
-
-local SearchBox = Create("TextBox", {
-	Name = "SearchBox",
-	Size = UDim2.new(1, -34, 1, 0),
-	Position = UDim2.fromOffset(30, 0),
-	BackgroundTransparency = 1,
-	PlaceholderText = "Search features...",
-	PlaceholderColor3 = Theme.TextSecondary,
-	Text = "",
-	TextColor3 = Theme.TextPrimary,
-	Font = Theme.FontRegular,
-	TextSize = 13,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	ClearTextOnFocus = false,
-	Parent = SearchContainer,
-})
-
---// Tab List Container
-local TabList = Create("ScrollingFrame", {
-	Name = "TabList",
-	Size = UDim2.new(1, -24, 1, -172),
-	Position = UDim2.fromOffset(12, 108),
-	BackgroundTransparency = 1,
-	ScrollBarThickness = 0,
-	CanvasSize = UDim2.new(0, 0, 0, 0),
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	Parent = Sidebar,
-}, {
-	Round(UDim.new(0, 10)),
-	Create("UIListLayout", {
-		Padding = UDim.new(0, 6),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-	})
-})
-
---// User Profile Card (Bottom-Left)
-local UserThumb = ""
-pcall(function()
-	UserThumb = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
-end)
-
-Create("Frame", {
-	Name = "ProfileCard",
-	Size = UDim2.new(1, -24, 0, 46),
-	Position = UDim2.new(0, 12, 1, -56),
-	BackgroundColor3 = Theme.CardBg,
-	BackgroundTransparency = 0.35,
-	Parent = Sidebar,
-}, {
-	Round(UDim.new(0, 12)),
-	Create("ImageLabel", {
-		Size = UDim2.fromOffset(32, 32),
-		Position = UDim2.new(0, 7, 0.5, -16),
-		BackgroundColor3 = Theme.MainBg,
-		Image = UserThumb,
-	}, {
-		Round(UDim.new(1, 0)),
-	}),
-	Create("TextLabel", {
-		Size = UDim2.new(1, -48, 0, 16),
-		Position = UDim2.fromOffset(45, 7),
-		BackgroundTransparency = 1,
-		Text = LocalPlayer.DisplayName,
-		TextColor3 = Theme.TextPrimary,
-		Font = Theme.FontBold,
-		TextSize = 12,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	}),
-	Create("TextLabel", {
-		Size = UDim2.new(1, -48, 0, 14),
-		Position = UDim2.fromOffset(45, 23),
-		BackgroundTransparency = 1,
-		Text = "@" .. LocalPlayer.Name,
-		TextColor3 = Theme.TextSecondary,
-		Font = Theme.FontRegular,
-		TextSize = 11,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-	})
-})
-
---// Right Content Area
-local ContentArea = Create("Frame", {
-	Name = "ContentArea",
-	Size = UDim2.new(1, -185, 1, 0),
-	Position = UDim2.fromOffset(185, 0),
-	BackgroundTransparency = 1,
-	Parent = MainFrame,
-}, {
-	Round(UDim.new(0, 16)),
-})
-
---// Top Bar (Page Title + Window Controls)
-local TopBar = Create("Frame", {
-	Size = UDim2.new(1, -32, 0, 46),
-	Position = UDim2.fromOffset(16, 10),
-	BackgroundTransparency = 1,
-	Parent = ContentArea,
-}, {
-	Round(UDim.new(0, 10)),
-})
-
---// Lock State & Smooth Dragging System
-local isLocked = false
-local dragging, dragInput, dragStart, startPos
-
-local function EnableWindowDrag(dragHandle)
-	dragHandle.InputBegan:Connect(function(input)
-		if isLocked then return end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			dragStart = input.Position
-			startPos = MainFrame.Position
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-				end
-			end)
-		end
-	end)
-	dragHandle.InputChanged:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-			dragInput = input
-		end
-	end)
-end
-
-UserInputService.InputChanged:Connect(function(input)
-	if input == dragInput and dragging and not isLocked then
-		local scale = MainScale.Scale
-		local delta = (input.Position - dragStart) / scale
-		MainFrame.Position = UDim2.new(
-			startPos.X.Scale,
-			startPos.X.Offset + delta.X,
-			startPos.Y.Scale,
-			startPos.Y.Offset + delta.Y
-		)
-		ClampMainFrame()
-	end
-end)
-
-EnableWindowDrag(TopBar)
-EnableWindowDrag(HeaderFrame)
-
-local PageTitle = Create("TextLabel", {
-	Size = UDim2.new(1, -76, 1, 0),
-	BackgroundTransparency = 1,
-	Text = "Elements",
-	TextColor3 = Theme.TextPrimary,
-	Font = Theme.FontBold,
-	TextSize = 20,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	Parent = TopBar,
-})
-
--- Window Controls (Minimize & Close)
-local ControlsFrame = Create("Frame", {
-	Size = UDim2.fromOffset(64, 28),
-	Position = UDim2.new(1, -64, 0.5, -14),
-	BackgroundTransparency = 1,
-	Parent = TopBar,
-}, {
-	Round(UDim.new(0, 8)),
-	Create("UIListLayout", {
-		FillDirection = Enum.FillDirection.Horizontal,
-		HorizontalAlignment = Enum.HorizontalAlignment.Right,
-		Padding = UDim.new(0, 6),
-	})
-})
-
-local MinBtn = Create("TextButton", {
-	Size = UDim2.fromOffset(28, 28),
-	BackgroundColor3 = Theme.CardBg,
-	BackgroundTransparency = 0.3,
-	Text = "—",
-	TextColor3 = Theme.TextSecondary,
-	Font = Theme.FontBold,
-	TextSize = 13,
-	Parent = ControlsFrame,
-}, { Round(UDim.new(0, 8)) })
-
-local CloseBtn = Create("TextButton", {
-	Size = UDim2.fromOffset(28, 28),
-	BackgroundColor3 = Theme.CardBg,
-	BackgroundTransparency = 0.3,
-	Text = "x",
-	TextColor3 = Theme.TextSecondary,
-	Font = Theme.FontBold,
-	TextSize = 15,
-	Parent = ControlsFrame,
-}, { Round(UDim.new(0, 8)) })
-
-local DockToggleBtn = Create("TextButton", {
-	Name = "ToggleButton",
-	Size = UDim2.new(1, 0, 0, 27),
-	LayoutOrder = 1,
-	BackgroundColor3 = Theme.Accent,
-	BackgroundTransparency = 0.15,
-	Text = "Toggle",
-	TextColor3 = Color3.new(1, 1, 1),
-	Font = Theme.FontBold,
-	TextSize = 12,
-	AutoButtonColor = false,
-	Parent = DockFrame,
-}, { Round(UDim.new(0, 8)) })
-
-local DockLockBtn = Create("TextButton", {
-	Name = "LockButton",
-	Size = UDim2.new(1, 0, 0, 27),
-	LayoutOrder = 2,
-	BackgroundColor3 = Theme.CardBg,
-	BackgroundTransparency = 0.25,
-	Text = "Lock",
-	TextColor3 = Theme.TextSecondary,
-	Font = Theme.FontBold,
-	TextSize = 12,
-	AutoButtonColor = false,
-	Parent = DockFrame,
-}, { Round(UDim.new(0, 8)) })
-
-local function SetUIVisible(visible)
-	MainFrame.Visible = visible
-	Tween(DockToggleBtn, 0.18, {
-		BackgroundColor3 = visible and Theme.Accent or Theme.CardBg,
-		TextColor3 = visible and Color3.new(1, 1, 1) or Theme.TextSecondary,
-	})
-	if visible then
-		UpdateResponsiveLayout()
-	end
-end
-
-local function SetUILocked(locked)
-	isLocked = locked
-	if isLocked then
-		dragging = false
-	end
-	DockLockBtn.Text = isLocked and "Locked" or "Lock"
-	Tween(DockLockBtn, 0.18, {
-		BackgroundColor3 = isLocked and Theme.Accent or Theme.CardBg,
-		BackgroundTransparency = isLocked and 0.15 or 0.25,
-		TextColor3 = isLocked and Color3.new(1, 1, 1) or Theme.TextSecondary,
-	})
-end
-
-MinBtn.MouseButton1Click:Connect(function()
-	isMinimized = not isMinimized
-	Tween(MainFrame, 0.3, { Size = UDim2.fromOffset(BASE_WIDTH, isMinimized and MIN_HEIGHT or BASE_HEIGHT) })
-	task.defer(ClampMainFrame)
-end)
-
-CloseBtn.MouseButton1Click:Connect(function()
-	SetUIVisible(false)
-end)
-
-DockToggleBtn.MouseButton1Click:Connect(function()
-	SetUIVisible(not MainFrame.Visible)
-end)
-
-DockLockBtn.MouseButton1Click:Connect(function()
-	SetUILocked(not isLocked)
-end)
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if input.KeyCode == Enum.KeyCode.RightAlt then
-		SetUIVisible(not MainFrame.Visible)
-	end
-end)
-
---// Pages Container & Search Results Container
-local PagesHolder = Create("Frame", {
-	Size = UDim2.new(1, -32, 1, -66),
-	Position = UDim2.fromOffset(16, 56),
-	BackgroundTransparency = 1,
-	Parent = ContentArea,
-}, {
-	Round(UDim.new(0, 10)),
-})
-
-local SearchResultsPage = Create("ScrollingFrame", {
-	Name = "SearchResultsPage",
-	Size = UDim2.fromScale(1, 1),
-	BackgroundTransparency = 1,
-	ScrollBarThickness = 3,
-	ScrollBarImageColor3 = Theme.Stroke,
-	CanvasSize = UDim2.new(0, 0, 0, 0),
-	AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	Visible = false,
-	Parent = PagesHolder,
-}, {
-	Round(UDim.new(0, 10)),
-	Create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
-	Create("UIPadding", { PaddingBottom = UDim.new(0, 12), PaddingRight = UDim.new(0, 6) })
-})
-
---// UI Library API
-local UI = {}
-local Tabs = {}
-local AllElements = {}
-local ActiveTab = nil
-
-local function SelectTab(tabObj)
-	ActiveTab = tabObj
-	SearchBox.Text = ""
-	SearchResultsPage.Visible = false
-	PageTitle.Text = tabObj.Name
-
-	for _, t in ipairs(Tabs) do
-		local isSelected = (t == tabObj)
-		t.Page.Visible = isSelected
-		Tween(t.Button, 0.2, {
-			BackgroundTransparency = isSelected and 0.15 or 1,
-			BackgroundColor3 = isSelected and Theme.CardHover or Theme.CardBg
-		})
-		Tween(t.Label, 0.2, {
-			TextColor3 = isSelected and Theme.TextPrimary or Theme.TextSecondary
-		})
-		Tween(t.Indicator, 0.2, {
-			BackgroundTransparency = isSelected and 0 or 1
-		})
-	end
-end
-
-function UI:CreateTab(name, iconGlyph)
-	local TabBtn = Create("TextButton", {
-		Name = name .. "Tab",
-		Size = UDim2.new(1, 0, 0, 36),
-		BackgroundColor3 = Theme.CardHover,
-		BackgroundTransparency = 1,
-		Text = "",
-		AutoButtonColor = false,
-		Parent = TabList,
-	}, {
-		Round(UDim.new(0, 10)),
-	})
-
-	local Indicator = Create("Frame", {
-		Size = UDim2.new(0, 3, 0, 18),
-		Position = UDim2.new(0, 0, 0.5, -9),
-		BackgroundColor3 = Theme.Accent,
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		Parent = TabBtn,
-	}, { Round(UDim.new(1, 0)) })
-
-	Create("TextLabel", {
-		Size = UDim2.fromOffset(22, 22),
-		Position = UDim2.new(0, 10, 0.5, -11),
-		BackgroundTransparency = 1,
-		Text = iconGlyph or "+",
-		TextColor3 = Theme.TextSecondary,
-		Font = Theme.FontBold,
-		TextSize = 14,
-		Parent = TabBtn,
-	}, { Round(UDim.new(0, 6)) })
-
-	local TitleLbl = Create("TextLabel", {
-		Size = UDim2.new(1, -40, 1, 0),
-		Position = UDim2.fromOffset(36, 0),
-		BackgroundTransparency = 1,
-		Text = name,
-		TextColor3 = Theme.TextSecondary,
-		Font = Theme.FontMedium,
-		TextSize = 13,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = TabBtn,
-	}, { Round(UDim.new(0, 6)) })
-
-	local Page = Create("ScrollingFrame", {
-		Name = name .. "Page",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		ScrollBarThickness = 3,
-		ScrollBarImageColor3 = Theme.Stroke,
-		CanvasSize = UDim2.new(0, 0, 0, 0),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		Visible = false,
-		Parent = PagesHolder,
-	}, {
-		Round(UDim.new(0, 10)),
-		Create("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
-		Create("UIPadding", { PaddingBottom = UDim.new(0, 12), PaddingRight = UDim.new(0, 6) })
-	})
-
-	local tabObj = {
-		Name = name,
-		Button = TabBtn,
-		Label = TitleLbl,
-		Indicator = Indicator,
-		Page = Page,
-	}
-
-	TabBtn.MouseButton1Click:Connect(function()
-		SelectTab(tabObj)
-	end)
-
-	table.insert(Tabs, tabObj)
-	if #Tabs == 1 then
-		SelectTab(tabObj)
-	end
-
-	--// Component Builders inside Tab
-	local Elements = {}
-
-	function Elements:AddSection(sectionTitle)
-		local lbl = Create("TextLabel", {
-			Size = UDim2.new(1, 0, 0, 24),
-			BackgroundTransparency = 1,
-			Text = sectionTitle,
-			TextColor3 = Theme.TextPrimary,
-			Font = Theme.FontBold,
-			TextSize = 14,
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Parent = Page,
-		}, { Round(UDim.new(0, 6)) })
-		return lbl
-	end
-
-	local function CreateBaseCard(title, description)
-		local Card = Create("Frame", {
-			Name = title,
-			Size = UDim2.new(1, 0, 0, 56),
-			BackgroundColor3 = Theme.CardBg,
-			BackgroundTransparency = Theme.CardTransparency,
-			Parent = Page,
-		}, {
-			Round(UDim.new(0, 12)),
-			Create("UIStroke", { Color = Theme.Stroke, Thickness = 1, Transparency = 0.55 }),
-			Create("TextLabel", {
-				Size = UDim2.new(1, -175, 0, 18),
-				Position = UDim2.fromOffset(14, 10),
-				BackgroundTransparency = 1,
-				Text = title,
-				TextColor3 = Theme.TextPrimary,
-				Font = Theme.FontMedium,
-				TextSize = 14,
-				TextXAlignment = Enum.TextXAlignment.Left,
-			}),
-			Create("TextLabel", {
-				Size = UDim2.new(1, -175, 0, 16),
-				Position = UDim2.fromOffset(14, 29),
-				BackgroundTransparency = 1,
-				Text = description,
-				TextColor3 = Theme.TextSecondary,
-				Font = Theme.FontRegular,
-				TextSize = 12,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-			})
-		})
-
-		table.insert(AllElements, {
-			Title = string.lower(title),
-			Desc = string.lower(description),
-			Card = Card,
-			OriginalParent = Page,
-		})
-
-		return Card
-	end
-
-	function Elements:AddToggle(title, description, default, callback)
-		local state = default or false
-		local Card = CreateBaseCard(title, description)
-
-		local SwitchTrack = Create("TextButton", {
-			Size = UDim2.fromOffset(44, 24),
-			Position = UDim2.new(1, -58, 0.5, -12),
-			BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff,
-			Text = "",
-			AutoButtonColor = false,
-			Parent = Card,
-		}, { Round(UDim.new(1, 0)) })
-
-		local Knob = Create("Frame", {
-			Size = UDim2.fromOffset(18, 18),
-			Position = state and UDim2.fromOffset(23, 3) or UDim2.fromOffset(3, 3),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			Parent = SwitchTrack,
-		}, { Round(UDim.new(1, 0)) })
-
-		local function UpdateState(newState)
-			state = newState
-			Tween(SwitchTrack, 0.2, { BackgroundColor3 = state and Theme.Accent or Theme.ToggleOff })
-			Tween(Knob, 0.2, { Position = state and UDim2.fromOffset(23, 3) or UDim2.fromOffset(3, 3) })
-			if callback then callback(state) end
-		end
-
-		SwitchTrack.MouseButton1Click:Connect(function()
-			UpdateState(not state)
-		end)
-	end
-
-	function Elements:AddSlider(title, description, min, max, default, callback)
-		local range = max - min
-		if range <= 0 then
-			max = min
-			range = 0
-		end
-		local value = math.clamp(default or min, min, max)
-		local Card = CreateBaseCard(title, description)
-
-		local ValueLabel = Create("TextLabel", {
-			Size = UDim2.fromOffset(36, 20),
-			Position = UDim2.new(1, -162, 0.5, -10),
-			BackgroundTransparency = 1,
-			Text = tostring(value),
-			TextColor3 = Theme.TextPrimary,
-			Font = Theme.FontBold,
-			TextSize = 13,
-			TextXAlignment = Enum.TextXAlignment.Right,
-			Parent = Card,
-		}, { Round(UDim.new(0, 6)) })
-
-		local Hitbox = Create("TextButton", {
-			Name = "SliderHitbox",
-			Size = UDim2.fromOffset(106, 24),
-			Position = UDim2.new(1, -118, 0.5, -12),
-			BackgroundTransparency = 1,
-			Text = "",
-			AutoButtonColor = false,
-			Parent = Card,
-		}, { Round(UDim.new(0, 8)) })
-
-		local Track = Create("Frame", {
-			Size = UDim2.new(1, 0, 0, 5),
-			Position = UDim2.new(0, 0, 0.5, -2),
-			BackgroundColor3 = Theme.ToggleOff,
-			BorderSizePixel = 0,
-			Parent = Hitbox,
-		}, { Round(UDim.new(1, 0)) })
-
-		local initialAlpha = range > 0 and ((value - min) / range) or 0
-		local Fill = Create("Frame", {
-			Size = UDim2.new(initialAlpha, 0, 1, 0),
-			BackgroundColor3 = Theme.Accent,
-			BorderSizePixel = 0,
-			Parent = Track,
-		}, { Round(UDim.new(1, 0)) })
-
-		local Thumb = Create("Frame", {
-			Size = UDim2.fromOffset(14, 14),
-			Position = UDim2.new(initialAlpha, -7, 0.5, -7),
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			Parent = Track,
-		}, { Round(UDim.new(1, 0)) })
-
-		local sliderDragging = false
-		local function UpdateSlider(inputPos)
-			local trackWidth = Track.AbsoluteSize.X
-			if trackWidth <= 0 then return end
-			local alpha = math.clamp((inputPos.X - Track.AbsolutePosition.X) / trackWidth, 0, 1)
-			value = range > 0 and math.floor(min + range * alpha + 0.5) or min
-			local snappedAlpha = range > 0 and ((value - min) / range) or 0
-
-			Fill.Size = UDim2.new(snappedAlpha, 0, 1, 0)
-			Thumb.Position = UDim2.new(snappedAlpha, -7, 0.5, -7)
-			ValueLabel.Text = tostring(value)
-			if callback then callback(value) end
-		end
-
-		Hitbox.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				sliderDragging = true
-				local alpha = range > 0 and ((value - min) / range) or 0
-				Tween(Thumb, 0.12, { Size = UDim2.fromOffset(17, 17), Position = UDim2.new(alpha, -8.5, 0.5, -8.5) })
-				UpdateSlider(input.Position)
-			end
-		end)
-
-		UserInputService.InputEnded:Connect(function(input)
-			if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-				sliderDragging = false
-				local alpha = range > 0 and ((value - min) / range) or 0
-				Tween(Thumb, 0.12, { Size = UDim2.fromOffset(14, 14), Position = UDim2.new(alpha, -7, 0.5, -7) })
-			end
-		end)
-
-		UserInputService.InputChanged:Connect(function(input)
-			if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-				UpdateSlider(input.Position)
-			end
-		end)
-	end
-
-	function Elements:AddButton(title, description, buttonText, callback)
-		local Card = CreateBaseCard(title, description)
-		local Btn = Create("TextButton", {
-			Size = UDim2.fromOffset(88, 30),
-			Position = UDim2.new(1, -102, 0.5, -15),
-			BackgroundColor3 = Theme.Accent,
-			BackgroundTransparency = 0.15,
-			Text = buttonText or "Execute",
-			TextColor3 = Color3.new(1, 1, 1),
-			Font = Theme.FontBold,
-			TextSize = 12,
-			Parent = Card,
-		}, { Round(UDim.new(0, 8)) })
-
-		Btn.MouseButton1Click:Connect(function()
-			Tween(Btn, 0.1, { BackgroundTransparency = 0.45 })
-			task.wait(0.1)
-			Tween(Btn, 0.15, { BackgroundTransparency = 0.15 })
-			if callback then callback() end
-		end)
-	end
-
-	function Elements:AddLabel(title)
-		return Elements:AddSection(title)
-	end
-
-	function Elements:AddTextbox(title, description, callback)
-		local Card = CreateBaseCard(title, description)
-		local Box = Create("TextBox", {
-			Size = UDim2.fromOffset(126, 30),
-			Position = UDim2.new(1, -140, 0.5, -15),
-			BackgroundColor3 = Theme.CardHover,
-			BackgroundTransparency = 0.15,
-			Text = "",
-			PlaceholderText = "Enter value",
-			PlaceholderColor3 = Theme.TextSecondary,
-			TextColor3 = Theme.TextPrimary,
-			Font = Theme.FontMedium,
-			TextSize = 12,
-			ClearTextOnFocus = false,
-			Parent = Card,
-		}, { Round(UDim.new(0, 8)) })
-		Box.FocusLost:Connect(function()
-			if callback then callback(Box.Text) end
-		end)
-		return Box
-	end
-
-	function Elements:AddDropdown(title, options, callback)
-		local Card = CreateBaseCard(title, "")
-		local index = 1
-		local Button = Create("TextButton", {
-			Size = UDim2.fromOffset(126, 30),
-			Position = UDim2.new(1, -140, 0.5, -15),
-			BackgroundColor3 = Theme.CardHover,
-			BackgroundTransparency = 0.15,
-			Text = tostring(options and options[index] or "Select"),
-			TextColor3 = Theme.TextPrimary,
-			Font = Theme.FontBold,
-			TextSize = 12,
-			AutoButtonColor = false,
-			Parent = Card,
-		}, { Round(UDim.new(0, 8)) })
-		Button.MouseButton1Click:Connect(function()
-			if not options or #options == 0 then return end
-			index = (index % #options) + 1
-			Button.Text = tostring(options[index])
-			if callback then callback(options[index]) end
-		end)
-		return Button
-	end
-
-	function Elements:AddBanner(assetId, height)
-		local Card = CreateBaseCard("Featured", "Celeron highlight")
-		Card.Size = UDim2.new(1, 0, 0, math.clamp(height or 135, 56, 180))
-		Create("ImageLabel", {
-			Size = UDim2.new(1, -12, 1, -12),
-			Position = UDim2.fromOffset(6, 6),
-			BackgroundTransparency = 1,
-			Image = "rbxassetid://" .. tostring(assetId),
-			ScaleType = Enum.ScaleType.Fit,
-			Parent = Card,
-		})
-	end
-
-
-	return Elements
-end
-
---// Global Live Search Logic
-SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
-	local query = string.lower(SearchBox.Text)
-
-	if query == "" then
-		SearchResultsPage.Visible = false
-		for _, item in ipairs(AllElements) do
-			item.Card.Parent = item.OriginalParent
-		end
-		if ActiveTab then
-			ActiveTab.Page.Visible = true
-			PageTitle.Text = ActiveTab.Name
-		end
-	else
-		for _, t in ipairs(Tabs) do
-			t.Page.Visible = false
-		end
-		SearchResultsPage.Visible = true
-		PageTitle.Text = 'Search: "' .. SearchBox.Text .. '"'
-
-		for _, item in ipairs(AllElements) do
-			if string.find(item.Title, query, 1, true) or string.find(item.Desc, query, 1, true) then
-				item.Card.Parent = SearchResultsPage
-			else
-				item.Card.Parent = item.OriginalParent
-			end
-		end
-	end
-end)
-
-
-
--- DragonHub compatibility UI layer
-local ui = {}
-
-function ui:Create(config)
-	return setmetatable({ Config = config }, {
-		__index = {
-			Tab = function(window, name)
-				local glyph = string.sub(name, 1, 1)
-				local elements = UI:CreateTab(name, glyph)
-				local wrapper = {}
-
-				function wrapper:Label(text)
-					return elements:AddLabel(text)
-				end
-
-				function wrapper:Folder(title, color, expanded)
-					elements:AddSection(title)
-					return self
-				end
-
-				function wrapper:Banner(assetId, height)
-					return elements:AddBanner(assetId, height)
-				end
-
-				function wrapper:Button(title, description, callback)
-					if type(description) == "function" and callback == nil then
-						callback = description
-						description = ""
-					end
-					return elements:AddButton(title, description or "", "Execute", callback)
-				end
-
-				function wrapper:Toggle(title, description, callback)
-					if type(description) == "function" and callback == nil then
-						callback = description
-						description = ""
-					end
-					return elements:AddToggle(title, description or "", false, callback)
-				end
-
-				function wrapper:Slider(title, default, min, max, step, callback)
-					local quantizeCallback = callback
-					if step and callback then
-						quantizeCallback = function(value)
-							value = tonumber(value) or 0
-							local snapped = min + math.floor(((value - min) / step) + 0.5) * step
-							callback(snapped)
-						end
-					end
-					return elements:AddSlider(title, "", min, max, default, quantizeCallback)
-				end
-
-				function wrapper:Dropdown(title, options, callback)
-					return elements:AddDropdown(title, options, callback)
-				end
-
-				function wrapper:Textbox(title, description, callback)
-					return elements:AddTextbox(title, description or "", callback)
-				end
-
-				return setmetatable(wrapper, { __index = elements })
-			end,
-		},
-	})
-end
+local ui = loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/ui"))() -- yo ts ui :rofl:
 
 local win = ui:Create({
-	Name = "DragonHub",
-	ThemeColor = Color3.fromRGB(88, 130, 250),
-	StartupSound = "rbxassetid://6958727243",
-	ThemeFont = Enum.Font.GothamBold,
-	ToggledSideBar = true,
+    Name = "Celeron's GUI (Azure Latch)",
+    ThemeColor = Color3.fromRGB(152, 58, 201),
+	ThemeGradient = Color3.fromRGB(95, 11, 143),
+    StartupSound = "rbxassetid://6958727243",
+    ThemeFont = Enum.Font.GothamBold,
+	ToggledSideBar = true
 })
-
-
 
 local hometab = win:Tab("Home")
 local maintab = win:Tab("Blatant")
@@ -1287,6 +235,7 @@ ballfolder:Toggle("Auto Goal", "Attempts To Steal The Ball And Score.", function
                     local goal = localplayer.Team.Name == "A" and bgoal or agoal
                     if root and goal then
                         root.CFrame = goal.CFrame
+                        task.wait(0.185)
                         NET:FireServer(
                             buffer.fromstring(buffers["base"]),
                             {{"kick", 20, false, vector.create(0, 1, 0)}}
@@ -1305,13 +254,11 @@ end)
 
 local alwaysBallState = {
     enabled = false,
-    thread = nil,
-    originalGravity = workspace.Gravity
+    conn = nil
 }
 
-ballfolder:Toggle("Always Ball", "Attempts To Always Hold The Ball (zero gravity while active).", function(v)
-    if alwaysBallState.enabled == v then return end
-    alwaysBallState.enabled = v
+ballfolder:Toggle("Always Ball", "Attempts To Always Hold The Ball (zero gravity while active).", function()
+    alwaysBallState.enabled = not alwaysBallState.enabled
     game.StarterGui:SetCore("SendNotification", {
         Title = "Always Ball",
         Text = alwaysBallState.enabled and "Enabled." or "Disabled.",
@@ -1320,7 +267,7 @@ ballfolder:Toggle("Always Ball", "Attempts To Always Hold The Ball (zero gravity
     
     if alwaysBallState.enabled then
         workspace.Gravity = 0
-        alwaysBallState.thread = task.spawn(function()
+        alwaysBallState.conn = coroutine.wrap(function()
             while alwaysBallState.enabled do
                 local root = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                 local ball = workspace.Terrain:FindFirstChild("Ball")
@@ -1342,13 +289,9 @@ ballfolder:Toggle("Always Ball", "Attempts To Always Hold The Ball (zero gravity
                 end
                 task.wait(0.1)
             end
-            if not alwaysBallState.enabled then
-                workspace.Gravity = alwaysBallState.originalGravity
-            end
-        end)
+        end)()
     else
-        alwaysBallState.thread = nil
-        workspace.Gravity = alwaysBallState.originalGravity
+        workspace.Gravity = 196.2
     end
 end)
 
@@ -1512,33 +455,28 @@ ballfolder:Button("Get Flow (Req. Ball)", "Click To Attempt Getting Flow. Click 
     end)
 end)
 
-local stealLoopStates = {
-    steal = false,
-    bring = false,
-    aikuSteal = false,
-    aikuBring = false,
-}
+local stealActive = false
 
 ballfolder:Button("Steal Ball", "Repeatedly Attempts To Get The Ball. Click Again To Cancel.", function()
     local hrp = flowPartData.LocalPlayer.Character and flowPartData.LocalPlayer.Character.HumanoidRootPart
     if not hrp then return end
 
-    if stealLoopStates.steal then
-        stealLoopStates.steal = false
+    if stealActive then
+        stealActive = false
         return
     end
 
-    stealLoopStates.steal = true
+    stealActive = true
 
     spawn(function()
-        while stealLoopStates.steal and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
+        while stealActive and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
             local ball = workspace.Terrain:FindFirstChild("Ball")
             if ball then
                 hrp.CFrame = CFrame.new(ball.Position)
             end
 
             for _, p in game.Players:GetPlayers() do
-                if not stealLoopStates.steal then break end
+                if not stealActive then break end
                 if p ~= flowPartData.LocalPlayer then
                     local b = p.Character and p.Character:FindFirstChild("Ball")
                     if b then
@@ -1551,7 +489,7 @@ ballfolder:Button("Steal Ball", "Repeatedly Attempts To Get The Ball. Click Agai
             task.wait(0.05)
         end
 
-        stealLoopStates.steal = false
+        stealActive = false
     end)
 end)
 
@@ -1559,24 +497,24 @@ ballfolder:Button("Bring Ball", "Steals The Ball Then Teleports Back. Click Agai
     local hrp = flowPartData.LocalPlayer.Character and flowPartData.LocalPlayer.Character.HumanoidRootPart
     if not hrp then return end
 
-    if stealLoopStates.bring then
-        stealLoopStates.bring = false
+    if stealActive then
+        stealActive = false
         return
     end
 
-    stealLoopStates.bring = true
+    stealActive = true
 
     spawn(function()
         local orig = hrp.CFrame
 
-        while stealLoopStates.bring and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
+        while stealActive and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
             local ball = workspace.Terrain:FindFirstChild("Ball")
             if ball then
                 hrp.CFrame = CFrame.new(ball.Position)
             end
 
             for _, p in game.Players:GetPlayers() do
-                if not stealLoopStates.bring then break end
+                if not stealActive then break end
                 if p ~= flowPartData.LocalPlayer then
                     local ob = p.Character and p.Character:FindFirstChild("Ball")
                     if ob then
@@ -1589,11 +527,11 @@ ballfolder:Button("Bring Ball", "Steals The Ball Then Teleports Back. Click Agai
             task.wait(0.05)
         end
 
-        if stealLoopStates.bring and hrp and hrp.Parent and flowPartData.LocalPlayer.Character:FindFirstChild("Ball") then
+        if stealActive and hrp and hrp.Parent and flowPartData.LocalPlayer.Character:FindFirstChild("Ball") then
             hrp.CFrame = orig
         end
 
-        stealLoopStates.bring = false
+        stealActive = false
     end)
 end)
 
@@ -1602,22 +540,22 @@ ballfolder:Button("Steal Ball (Aiku)", "Repeatedly Attempts To Get The Ball Via 
     local hrp = flowPartData.LocalPlayer.Character and flowPartData.LocalPlayer.Character.HumanoidRootPart
     if not hrp then return end
 
-    if stealLoopStates.aikuSteal then
-        stealLoopStates.aikuSteal = false
+    if stealActive then
+        stealActive = false
         return
     end
 
-    stealLoopStates.aikuSteal = true
+    stealActive = true
 
     spawn(function()
-        while stealLoopStates.aikuSteal and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
+        while stealActive and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
             local ball = workspace.Terrain:FindFirstChild("Ball")
             if ball then
                 hrp.CFrame = CFrame.new(ball.Position)
             end
 
             for _, p in game.Players:GetPlayers() do
-                if not stealLoopStates.aikuSteal then break end
+                if not stealActive then break end
                 if p ~= flowPartData.LocalPlayer then
                     local b = p.Character and p.Character:FindFirstChild("Ball")
                     if b then
@@ -1630,7 +568,7 @@ ballfolder:Button("Steal Ball (Aiku)", "Repeatedly Attempts To Get The Ball Via 
             task.wait(0.05)
         end
 
-        stealLoopStates.aikuSteal = false
+        stealActive = false
     end)
 end)
 
@@ -1638,24 +576,24 @@ ballfolder:Button("Bring Ball (Aiku)", "Steals The Ball Via Reflex Tackle Then T
     local hrp = flowPartData.LocalPlayer.Character and flowPartData.LocalPlayer.Character.HumanoidRootPart
     if not hrp then return end
 
-    if stealLoopStates.aikuBring then
-        stealLoopStates.aikuBring = false
+    if stealActive then
+        stealActive = false
         return
     end
 
-    stealLoopStates.aikuBring = true
+    stealActive = true
 
     spawn(function()
         local orig = hrp.CFrame
 
-        while stealLoopStates.aikuBring and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
+        while stealActive and hrp and hrp.Parent and not flowPartData.LocalPlayer.Character:FindFirstChild("Ball") do
             local ball = workspace.Terrain:FindFirstChild("Ball")
             if ball then
                 hrp.CFrame = CFrame.new(ball.Position)
             end
 
             for _, p in game.Players:GetPlayers() do
-                if not stealLoopStates.aikuBring then break end
+                if not stealActive then break end
                 if p ~= flowPartData.LocalPlayer then
                     local ob = p.Character and p.Character:FindFirstChild("Ball")
                     if ob then
@@ -1668,11 +606,11 @@ ballfolder:Button("Bring Ball (Aiku)", "Steals The Ball Via Reflex Tackle Then T
             task.wait(0.7)
         end
 
-        if stealLoopStates.aikuBring and hrp and hrp.Parent and flowPartData.LocalPlayer.Character:FindFirstChild("Ball") then
+        if stealActive and hrp and hrp.Parent and flowPartData.LocalPlayer.Character:FindFirstChild("Ball") then
             hrp.CFrame = orig
         end
 
-        stealLoopStates.aikuBring = false
+        stealActive = false
     end)
 end)
 
@@ -1886,7 +824,7 @@ breakball:Button("Break Ball (Player Method, Req. Ball)", "Breaks The Ball By Go
     local character = lplr.Character or lplr.CharacterAdded:Wait()
 
     character:WaitForChild("HumanoidRootPart").CFrame =
-        CFrame.new(baseplatePosition + Vector3.new(0, 10000, 0))
+        CFrame.new(baseplatePosition + Vector3.new(0, 100000000000000, 0))
 end)
 
 breakball:Button("Break Ball (Ball Method, Req. Ball)", "Breaks The Ball By Kicking It Out Of Bounds.", function()
@@ -2067,16 +1005,16 @@ ballmag:Toggle("Ball Magnet On Bind Held", "If Enabled, Ball Magnet Only Grabs W
     })
 end)
 
-local function setupBallMagnetCharacter(char)
+local function setupCharacter(char)
     ballMagnetState.hrp = char:WaitForChild("HumanoidRootPart", 10)
 end
 
 if Players.LocalPlayer.Character then
-    setupBallMagnetCharacter(Players.LocalPlayer.Character)
+    setupCharacter(Players.LocalPlayer.Character)
 end
 
 Players.LocalPlayer.CharacterAdded:Connect(function(char)
-    setupBallMagnetCharacter(char)
+    setupCharacter(char)
 end)
 
 ballmag:Toggle("Ball Magnet Radius Hitbox", "Shows The Magnet's Radius Hitbox.", function()
@@ -2196,9 +1134,9 @@ local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local extraHud = playerGui:FindFirstChild("ExtraHud")
-local fpsCounter = extraHud and extraHud:FindFirstChild("FPSCounter")
-local icon = fpsCounter and fpsCounter:FindFirstChild("icon")
+local extraHud = playerGui:WaitForChild("ExtraHud")
+local fpsCounter = extraHud:WaitForChild("FPSCounter")
+local icon = fpsCounter:WaitForChild("icon")
 
 local existingGui = playerGui:FindFirstChild("cubies")
 if existingGui then
@@ -2255,7 +1193,6 @@ local function updcounterui()
 end
 
 function positionCubes()
-    if not icon then return end
     local iconPos = icon.AbsolutePosition
     local iconSize = icon.AbsoluteSize
     
@@ -2315,13 +1252,13 @@ if autoSkillState.showActiveCounters then
 else
     screenGui.Enabled = false
 end
-if icon then
-    icon:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
-        if autoSkillState.showActiveCounters then
-            positionCubes()
-        end
-    end)
-end
+icon:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+    if autoSkillState.showActiveCounters then
+        positionCubes()
+    end
+end)
+
+icon:GetPropertyChangedSignal("AbsolutePosition"):Connect(positionCubes)
 
 
 local steal_anims = {
@@ -2678,11 +1615,11 @@ add:Label("Fun Features: Pretty Fun Features I'd Say.")
 
 local AnimationId = "rbxassetid://106978014114973"
 local safety = Vector3.new(-540, 3, 1274)
-local mapFolder = workspace:FindFirstChild("map")
-mapFolmain = mapFolder and mapFolder:FindFirstChild("map")
-if mapFolder and mapFolmain then
-    mapFolmain = mapFolmain:FindFirstChild("sanam") and mapFolmain.sanam:FindFirstChild("main")
-end
+mapFolmain = workspace.map.map.sanam.main
+local floorAie = workspace.map.map.sanam.main.Size
+
+workspace.map.map.sanam.main.Size = Vector3.new(floorAie.X, 2, floorAie.Z)
+workspace.map.map.sanam.main.Position += Vector3.new(0, (floorAie.Y - 2) / 2, 0)
 
 invisState = {
     active = false,
@@ -2716,7 +1653,7 @@ local function startInvisibility()
     invisState.animationTrack = track
 end
 
-local function setupInvisibilityCharacter(char)
+local function setupCharacter(char)
     invisState.character = char
     invisState.humanoid = char:WaitForChild("Humanoid", 5)
 
@@ -2742,7 +1679,6 @@ RunService.RenderStepped:Connect(function()
             return
         end
         
-        if not mapFolmain or not mapFolmain.Parent then return end
         local floorTop = mapFolmain.Position.Y + mapFolmain.Size.Y / 2
         if rootPart.Position.Y > floorTop + 20 then
             local _, yaw, _ = rootPart.CFrame:ToOrientation()
@@ -2753,10 +1689,10 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-player.CharacterAdded:Connect(setupInvisibilityCharacter)
+player.CharacterAdded:Connect(setupCharacter)
 
 if player.Character then
-    setupInvisibilityCharacter(player.Character)
+    setupCharacter(player.Character)
 end
 
 add:Toggle("Invisibility (Method: Animation)", "Makes You Almost Fully Invisible To Other Players Using An Animation.", function(v)
@@ -2914,14 +1850,10 @@ add:Button("Steal Screen Time (funny)", "Click Z To Disable, Steals Screen Time.
     local plr = game.Players.LocalPlayer
     local char = plr.Character
     local cam = workspace.CurrentCamera
-    if getgenv().StealScreenInputConnection then
-        getgenv().StealScreenInputConnection:Disconnect()
-        getgenv().StealScreenInputConnection = nil
-    end
 
     local stopped = false
 
-    getgenv().StealScreenInputConnection = game.UserInputService.InputBegan:Connect(function(key, bg)
+    game.UserInputService.InputBegan:Connect(function(key, bg)
         if bg then return end
 
         if key.KeyCode == Enum.KeyCode.Z then
@@ -3023,13 +1955,10 @@ local sg = game:GetService("StarterGui")
 local ws = game:GetService("Workspace")
 
 local function setCollide(state)
-    local map = ws:FindFirstChild("map")
-    if not map then return end
-    local gkBarrier = map:FindFirstChild("gkbarriar")
-    local a = gkBarrier and gkBarrier:FindFirstChild("Abarriar")
-    local b = gkBarrier and gkBarrier:FindFirstChild("Bbarriar")
-    local ag = map:FindFirstChild("Agoal")
-    local bg = map:FindFirstChild("Bgoal")
+    local a = ws.map.gkbarriar.Abarriar
+    local b = ws.map.gkbarriar.Bbarriar
+    local ag = ws.map.Agoal
+    local bg = ws.map.Bgoal
 
     if a then a.CanCollide = state end
     if b then b.CanCollide = state end
@@ -3067,16 +1996,16 @@ local function applyNoStun()
     end
 end
 
-local function setupNoStunCharacter(char)
+local function setupCharacter(char)
     if nostunState.enabled then
         applyNoStun()
     end
 end
 
-nostunPlayer.CharacterAdded:Connect(setupNoStunCharacter)
+nostunPlayer.CharacterAdded:Connect(setupCharacter)
 
 if nostunPlayer.Character then
-    setupNoStunCharacter(nostunPlayer.Character)
+    setupCharacter(nostunPlayer.Character)
 end
 
 oth:Toggle("No Stun", "Overrides The Stunned State So You Can Move.", function(v)
@@ -3440,14 +2369,14 @@ local function hookTraps(char)
     end)
 end
 
-local function setupTrapCharacter(char)
+local function setupCharacter(char)
     hookTraps(char)
 end
 
 if player.Character then
-    setupTrapCharacter(player.Character)
+    setupCharacter(player.Character)
 end
-player.CharacterAdded:Connect(setupTrapCharacter)
+player.CharacterAdded:Connect(setupCharacter)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
@@ -3812,13 +2741,7 @@ local function updateDashes(dt)
             local baseLook = hrp.CFrame.LookVector
             local right = baseLook:Cross(Vector3.new(0,1,0))
             local offset = dash.offset
-            local candidate = right * -offset.X + baseLook * offset.Z
-            candidate = Vector3.new(candidate.X, 0, candidate.Z)
-            if candidate.Magnitude > 0.01 then
-                moveDir = candidate.Unit
-            else
-                moveDir = DEFAULT_DIR
-            end
+            moveDir = (right * -offset.X + baseLook * offset.Z).Unit
         else
             local look = hrp.CFrame.LookVector
             moveDir = Vector3.new(look.X, 0, look.Z).Unit
@@ -3916,7 +2839,7 @@ local function onAnimationPlayed(track)
     end
 end
 
-local function setupDistanceCharacter(char)
+local function setupCharacter(char)
     local hum = char:WaitForChild("Humanoid", 5)
     if not hum then return end
     local animator = hum:WaitForChild("Animator", 5)
@@ -3927,9 +2850,9 @@ local function setupDistanceCharacter(char)
 end
 
 if player.Character then
-    setupDistanceCharacter(player.Character)
+    setupCharacter(player.Character)
 end
-player.CharacterAdded:Connect(setupDistanceCharacter)
+player.CharacterAdded:Connect(setupCharacter)
 
 d:Label("Universal Movement Buffs.")
 d:Slider("Tackle Distance", 0, 0, 75, 1, function(v)
@@ -4239,28 +3162,13 @@ game:GetService("RunService").RenderStepped:Connect(function()
         or (auto_activate_state.bind_key ~= nil and game:GetService("UserInputService"):IsKeyDown(auto_activate_state.bind_key))
 
     if not auto_activate_state.toggle_state or not held_ok or auto_activate_state.db then
-        local coreOk, coreGui = pcall(function()
-            return game:GetService("CoreGui")
-        end)
-        if coreOk and coreGui then
-            local existing = coreGui:FindFirstChild("AutoActGui")
-            if existing then existing:Destroy() end
-        else
-            local playerGui = game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
-            if playerGui then
-                local existing = playerGui:FindFirstChild("AutoActGui")
-                if existing then existing:Destroy() end
-            end
+        if game.CoreGui:FindFirstChild("AutoActGui") then
+            game.CoreGui.AutoActGui:Destroy()
         end
         return
     end
 
-    local coreOk, coreGui = pcall(function()
-        return game:GetService("CoreGui")
-    end)
-    local parentGui = coreOk and coreGui or game:GetService("Players").LocalPlayer:FindFirstChild("PlayerGui")
-    if not parentGui then return end
-    if not parentGui:FindFirstChild("AutoActGui") then
+    if not game.CoreGui:FindFirstChild("AutoActGui") then
         local gui = Instance.new("ScreenGui")
         gui.Name = "AutoActGui"
 
@@ -4276,7 +3184,7 @@ game:GetService("RunService").RenderStepped:Connect(function()
         corner.CornerRadius = UDim.new(1, 0)
         corner.Parent = dot
 
-        gui.Parent = parentGui
+        gui.Parent = game.CoreGui
     end
 
     local char = game.Players.LocalPlayer.Character
@@ -4660,7 +3568,6 @@ autoline:Toggle("Sae Line Ups", "Sae's Drive Shot Line Ups.", function(s)
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
-		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -4754,7 +3661,6 @@ autoline:Toggle("Kaiser Line Ups", "Kaiser's Impact Magnus Line Ups.", function(
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
-		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -4846,7 +3752,6 @@ autoline:Toggle("Yukimiya Line Ups", "Yukimiya's Gyro Shot Line Ups.", function(
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
-		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -4946,7 +3851,6 @@ autoline:Toggle("Karasu Line Ups", "Karasu's Dive Bomb Line Ups.", function(kar)
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
-		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -5036,7 +3940,6 @@ autoline:Toggle("Rin Line Ups", "Rin's Curve Shot Line Ups.", function(r)
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
-		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -5110,7 +4013,6 @@ autoline:Toggle("Rin Flow Line Ups", "Rin's Kill Shot Line Ups.", function(k)
 
 		local agoal = map:FindFirstChild("Agoal")
 		local bgoal = map:FindFirstChild("Bgoal")
-		if not agoal or not bgoal then return end
 
 		local agoalPos = agoal.Position
 		local bgoalPos = bgoal.Position
@@ -5515,11 +4417,9 @@ local function getKey(name)
 end
 
 local justReleasedBall = false
-local ballWorkspace = ReplicatedStorage:FindFirstChild("workspace")
-local ballHolder = ballWorkspace and ballWorkspace:FindFirstChild("ballHolder")
-local lastHolder = ballHolder and ballHolder.Value
+local ballHolder = ReplicatedStorage.workspace.ballHolder
+local lastHolder = ballHolder.Value
 
-if ballHolder then
 holderConn = ballHolder.Changed:Connect(function()
     if Config.AutoD then
         return
@@ -5532,7 +4432,6 @@ holderConn = ballHolder.Changed:Connect(function()
     end
     lastHolder = newHolder
 end)
-end
 
 local indicatorGui = Instance.new("ScreenGui")
 indicatorGui.Parent = game.Players.LocalPlayer.PlayerGui
@@ -5665,7 +4564,7 @@ heartbeatConn = RunService.Heartbeat:Connect(function()
     local hrp = character:FindFirstChild("HumanoidRootPart")
     if not hrp then hideSegments() return end
 
-    if (ballHolder and ballHolder.Value == character) or ball:IsDescendantOf(character) then
+    if ballHolder.Value == character or ball:IsDescendantOf(character) then
         hideSegments()
         return
     end
@@ -5846,11 +4745,10 @@ autogk:Button("Daffy's Auto GK", "Reset Or Click F4 To Disable.", function()
         gkPlayerState.align.Parent = gkPlayerState.hrp
     end
 
-    local gkWorkspace = ReplicatedStorage:FindFirstChild("workspace")
-    gkPlayerState.ballHolder = gkWorkspace and gkWorkspace:FindFirstChild("ballHolder")
-    gkPlayerState.lastHolder = gkPlayerState.ballHolder and gkPlayerState.ballHolder.Value
+    gkPlayerState.ballHolder = ReplicatedStorage.workspace.ballHolder
+    gkPlayerState.lastHolder = gkPlayerState.ballHolder.Value
 
-    if gkPlayerState.ballHolder then gkPlayerState.ballHolder.Changed:Connect(function()
+    gkPlayerState.ballHolder.Changed:Connect(function()
         local cur = gkPlayerState.ballHolder.Value
         if gkPlayerState.lastHolder == gkPlayerState.char and cur == nil then
             gkPlayerState.pause = true
@@ -5860,7 +4758,6 @@ autogk:Button("Daffy's Auto GK", "Reset Or Click F4 To Disable.", function()
         end
         gkPlayerState.lastHolder = cur
     end)
-    end
 
     gkPlayerState.remote = NET
 
@@ -6184,11 +5081,6 @@ st_input_began_conn = user_input_service.InputBegan:Connect(function(input, gpe)
 		st_autotop_held = true
 	end
 end)
-
--- Forward definitions keep early connections and rebuild calls safe.
-st_hold_end = function() fire_hold = nil end
-st_slow_stop = function() slow_active = false; slow_base = nil; slow_hum = nil end
-st_clear_rings = function() if ring_key then ring_folder:ClearAllChildren(); ring_key = nil end end
 
 st_input_ended_conn = user_input_service.InputEnded:Connect(function(input, gpe)
 	if st_bind_matches(input) then
@@ -7127,16 +6019,11 @@ local othersil = maintab2:Folder("Other Features.", Color3.fromRGB(169, 5, 255),
 othersil:Label("Other Features: Self Explanatory, Other Silent Features.")
 
 local qteState = {
-    enabled = false,
-    connection = nil
+    enabled = false
 }
 
-othersil:Toggle("Auto QuickTimeEvent", "Automatically Does QuickTimeEvents, How Else Can I Explain It?", function(v)
-if qteState.connection then
-    qteState.connection:Disconnect()
-    qteState.connection = nil
-end
-qteState.enabled = v
+othersil:Toggle("Auto QuickTimeEvent", "Automatically Does QuickTimeEvents, How Else Can I Explain It?", function()
+qteState.enabled = not qteState.enabled
 
 local function sendNotification(status)
     if not autoSkillState.suppressNotifs then
@@ -7185,9 +6072,7 @@ local function checkQTE()
     end
 end
 
-if qteState.enabled then
-    qteState.connection = game:GetService("RunService").RenderStepped:Connect(checkQTE)
-end
+game:GetService("RunService").RenderStepped:Connect(checkQTE)
 
 sendNotification(qteState.enabled and "Enabled." or "Disabled.")
 end)
@@ -7286,34 +6171,34 @@ othersil:Toggle("Team Highlighting", "Highlights Your Teammates / Enemies Accord
 end)
 
 getgenv().AutoStealState = getgenv().AutoStealState or { enabled = false, connections = {} } 
-local autoStealState = getgenv().AutoStealState 
+state = getgenv().AutoStealState 
 
 othersil:Toggle("Auto Steal Ball", "Automatically Attempts To Steal When Opponent Whiffs A Counter.", function(v) 
-    local Players = game:GetService("Players") 
-    local RunService = game:GetService("RunService") 
-    local lp = Players.LocalPlayer 
-    autoStealState.enabled = v 
-    local animId = "rbxassetid://87049473772388" 
+    Players = game:GetService("Players") 
+    RunService = game:GetService("RunService") 
+    lp = Players.LocalPlayer 
+    state.enabled = v 
+    animId = "rbxassetid://87049473772388" 
     
-    local function getHRP(char) 
+    function getHRP(char) 
         return char and char:FindFirstChild("HumanoidRootPart") 
     end 
     
-    local function stareAt(targetHRP, opponentPlayer) 
-        local char = lp.Character 
-        local hrp = getHRP(char) 
+    function stareAt(targetHRP, opponentPlayer) 
+        char = lp.Character 
+        hrp = getHRP(char) 
         if not hrp or not targetHRP then return end 
         
         if (hrp.Position - targetHRP.Position).Magnitude > 30 then return end
         
-        local start = tick() 
-        local conn = RunService.RenderStepped:Connect(function() 
-            if not autoStealState.enabled or tick() - start > 0.5 then 
+        start = tick() 
+        conn = RunService.RenderStepped:Connect(function() 
+            if not state.enabled or tick() - start > 0.5 then 
                 conn:Disconnect() 
                 return 
             end 
-            local pos = hrp.Position 
-            local tpos = targetHRP.Position 
+            pos = hrp.Position 
+            tpos = targetHRP.Position 
             hrp.CFrame = CFrame.lookAt(pos, Vector3.new(tpos.X, pos.Y, tpos.Z)) 
 
 			local args = {
@@ -7323,33 +6208,33 @@ othersil:Toggle("Auto Steal Ball", "Automatically Attempts To Steal When Opponen
         end) 
     end 
     
-    local function hookCharacter(plr, char) 
-        local hum = char:WaitForChild("Humanoid") 
-        local animator = hum:WaitForChild("Animator") 
-        local conn = animator.AnimationPlayed:Connect(function(track) 
-            if not autoStealState.enabled then return end 
+    function hookCharacter(plr, char) 
+        hum = char:WaitForChild("Humanoid") 
+        animator = hum:WaitForChild("Animator") 
+        conn = animator.AnimationPlayed:Connect(function(track) 
+            if not state.enabled then return end 
             if track.Animation and track.Animation.AnimationId == animId then 
                 stareAt(getHRP(char), plr) 
             end 
         end) 
-        table.insert(autoStealState.connections, conn) 
+        table.insert(state.connections, conn) 
     end 
     
-    local function hookPlayer(plr) 
+    function hookPlayer(plr) 
         if plr == lp then return end 
         if plr.Character then 
             hookCharacter(plr, plr.Character) 
         end 
-        table.insert(autoStealState.connections, plr.CharacterAdded:Connect(function(char) 
+        table.insert(state.connections, plr.CharacterAdded:Connect(function(char) 
             hookCharacter(plr, char) 
         end)) 
     end 
     
     if not v then 
-        for _, c in ipairs(autoStealState.connections) do 
+        for _, c in ipairs(state.connections) do 
             c:Disconnect() 
         end 
-        table.clear(autoStealState.connections) 
+        table.clear(state.connections) 
         
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "Auto Steal",
@@ -7368,7 +6253,7 @@ othersil:Toggle("Auto Steal Ball", "Automatically Attempts To Steal When Opponen
     for _, p in ipairs(Players:GetPlayers()) do 
         hookPlayer(p) 
     end 
-    table.insert(autoStealState.connections, Players.PlayerAdded:Connect(hookPlayer)) 
+    table.insert(state.connections, Players.PlayerAdded:Connect(hookPlayer)) 
 end)
 
 local cutsceneState = {
@@ -7410,17 +6295,11 @@ local iframeState = {
     activeDots = {},
     dotSize = UDim2.new(0, 6, 0, 6),
     offset = Vector3.new(0, 3, 0),
-    updateInterval = 0.2,
-    childConnection = nil,
-    loopThread = nil
+    updateInterval = 0.2
 }
 
-othersil:Toggle("IFrame Indicator", "Shows The I-Frame Status Of All Players. (Green = Off, Red = On.)", function(v)
-    if iframeState.childConnection then
-        iframeState.childConnection:Disconnect()
-        iframeState.childConnection = nil
-    end
-    iframeState.enabled = v
+othersil:Toggle("IFrame Indicator", "Shows The I-Frame Status Of All Players. (Green = Off, Red = On.)", function()
+    iframeState.enabled = not iframeState.enabled
 
     local StarterGui = game:GetService("StarterGui")
     StarterGui:SetCore("SendNotification", {
@@ -7476,13 +6355,13 @@ othersil:Toggle("IFrame Indicator", "Shows The I-Frame Status Of All Players. (G
         for _, char in ipairs(charactersFolder:GetChildren()) do
             createDot(char)
         end
-        iframeState.childConnection = charactersFolder.ChildAdded:Connect(function(char)
+        charactersFolder.ChildAdded:Connect(function(char)
             task.wait(0.5)
             if iframeState.enabled then
                 createDot(char)
             end
         end)
-        iframeState.loopThread = task.spawn(function()
+        task.spawn(function()
             while iframeState.enabled do
                 for char, dot in pairs(iframeState.activeDots) do
                     if char and dot then
@@ -7614,7 +6493,7 @@ local mobform = {
     active = false
 }
 
-local function triggerFormless()
+local function trigger()
     if game:GetService("UserInputService").MouseBehavior ~= Enum.MouseBehavior.LockCenter then return end
     local lp = game:GetService("Players").LocalPlayer
     local char = lp.Character
@@ -7659,7 +6538,7 @@ local function triggerFormless()
     NET:FireServer(buffer.fromstring(buffers["base"]), { { "skill1" } })
 end
 
-local function makeDraggableFormless(frame)
+local function makeDraggable(frame)
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -7725,9 +6604,9 @@ local function show()
         btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
     end)
 
-    btn.Activated:Connect(triggerFormless)
+    btn.Activated:Connect(trigger)
 
-    makeDraggableFormless(btn)
+    makeDraggable(btn)
 end
 
 local function hide()
@@ -7752,7 +6631,7 @@ local airDribble = {
     enabled = true
 }
 
-local function triggerAirDribble()
+local function trigger()
     if not airDribble.enabled then return end
     local char = game:GetService("Players").LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -7772,7 +6651,7 @@ local function triggerAirDribble()
     )
 end
 
-local function makeDraggableAir(frame)
+local function makeDraggable(frame)
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -7827,8 +6706,8 @@ local function show()
 
     btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35) end)
     btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15) end)
-    btn.Activated:Connect(triggerAirDribble)
-    makeDraggableAir(btn)
+    btn.Activated:Connect(trigger)
+    makeDraggable(btn)
 end
 
 local function hide()
@@ -7872,7 +6751,7 @@ local function normalizeKey(key)
     return key:sub(1,1):upper() .. key:sub(2)
 end
 
-local function makeMobileDraggable(frame)
+local function makeDraggable(frame)
     local dragging, dragInput, dragStart, startPos
     frame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -7957,7 +6836,7 @@ mobilessss:Button("Create Mobile PC Key", "Creates A Mobile PC Key.", function()
         end
     end)
 
-    makeMobileDraggable(btn)
+    makeDraggable(btn)
     table.insert(getgenv().MobileKeySystem.buttons, sg)
 end)
 
@@ -8836,16 +7715,7 @@ exploittab:Toggle("Anti AFK", function()
 	})
 end)
 
-pcall(function()
-    local source = game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Scripts/refs/heads/main/oldthingyep", true)
-    loadstring(source)()
-end)
-pcall(function()
-    local source = game:HttpGet("https://pastebin.com/raw/rQMS2B9R", true)
-    loadstring(source)()
-end)
-pcall(function()
-    local source = game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/owner_anti_abuse_from_users")
-    loadstring(source)()
-end)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Scripts/refs/heads/main/oldthingyep",true))()
+loadstring(game:HttpGet("https://pastebin.com/raw/rQMS2B9R",true))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ghostofcelleron/Celeron/refs/heads/main/owner_anti_abuse_from_users"))()
 end
